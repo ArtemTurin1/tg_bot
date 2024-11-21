@@ -484,6 +484,10 @@ async def stats(message: Message):
 async def send_payment_options(message: types.Message):
     await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
 
+@router.message(F.text == 'Донат')
+async def send_payment_options(message: types.Message):
+    await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
+
 @router.callback_query(lambda callback: callback.data.startswith("pay_"))
 async def send_invoice(callback: types.CallbackQuery):
     amount = int(callback.data.split("_")[1])
@@ -504,21 +508,16 @@ async def send_invoice(callback: types.CallbackQuery):
 
 @router.pre_checkout_query()
 async def process_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
-    # Подтверждаем запрос
     print('ok')
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 @router.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
 async def successful_payment(message: types.Message):
     payment_info = message.successful_payment
-    amount = payment_info.total_amount / 100  # Преобразуем в рубли
-    user_id = message.from_user.id
-
-    # Обновляем баланс пользователя в базе данных
-    cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?", (amount, user_id))
+    amount = payment_info.total_amount / 100
+    cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?",
+                   (amount, message.from_user.id,))
     conn.commit()
-
-    # Отправляем уведомление
     await message.answer(f"Оплата успешно проведена! Ваш баланс пополнен на {amount} руб.")
 
 @router.message(F.text == 'Прокачать способности')
@@ -538,14 +537,14 @@ async def ability(message: Message):
     count_otvet = int(result[0])
     count_otvet_x = str(result[1])
     balls_x = str(result[2])
-    balans = int(result[3])
+    balance = int(result[3])
     balls = str(result[4])
     new_message = await message.answer(f'Ваши способности:\n'
                                  f'Количество жизней: {count_otvet}\n'
                                  f'X к востановлению жизни: {count_otvet_x}\n'
                                  f'X к увеличению баллов:{balls_x}\n'
                                  f'\nКоличество баллов:{balls}'
-                                 f'\nБаланс: {balans}\n'
+                                 f'\nБаланс: {balance}\n'
                                  f'\nВыберите способность, которую хотите прокочать:', reply_markup=kb.ability)
     user_messages[user_id] = [message.message_id, new_message.message_id]
     conn.commit()
