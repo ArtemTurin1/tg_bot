@@ -42,6 +42,9 @@ pump = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='За баллы', c
                                        [KeyboardButton(text = 'Вернуться назад', callback_data='to_main')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
+leave = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Покинуть соревнование')]],
+                           resize_keyboard=True,
+                           input_field_placeholder='Выберите пункт...')
 donat = InlineKeyboardMarkup(
     inline_keyboard=[
         [
@@ -50,11 +53,30 @@ donat = InlineKeyboardMarkup(
         ]
     ]
 )
+donat_life = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="3 жизни", callback_data="payl_3"),
+            InlineKeyboardButton(text="6 жизней", callback_data="payl_6")],
+            [InlineKeyboardButton(text="9 жизней", callback_data="payl_9"),
+            InlineKeyboardButton(text="12 жизней", callback_data="payl_12"),
+        ]
+    ]
+)
+
 async def materialcategorii():
     all_materialcategoriis = await get_materialcategoriis()
     keyboard = InlineKeyboardBuilder()
     for category in all_materialcategoriis:
         keyboard.add(InlineKeyboardButton(text=category.name, callback_data=f'category_{category.id}'))
+    keyboard.add(InlineKeyboardButton(text='На главную', callback_data='to_main'))
+    return keyboard.adjust(2).as_markup()
+
+async def arenacatalog():
+    all_arenacatalog = await get_materialcategoriis()
+    keyboard = InlineKeyboardBuilder()
+    for category in all_arenacatalog:
+        keyboard.add(InlineKeyboardButton(text=category.name, callback_data=f'arenacategory_{category.id}'))
     keyboard.add(InlineKeyboardButton(text='На главную', callback_data='to_main'))
     return keyboard.adjust(2).as_markup()
 

@@ -47,8 +47,9 @@ class Photomat(Base):
     __tablename__ = 'photos'
     id: Mapped[int] = mapped_column(primary_key=True)
     photo: Mapped[str] = mapped_column(String(50))
-    otvet: Mapped[str] = mapped_column(String(50))
+    answer: Mapped[str] = mapped_column(String(50))
     material: Mapped[int] = mapped_column(ForeignKey('materials.id'))
+    materialcat: Mapped[int] = mapped_column(ForeignKey('materialcats.id'))
 
 async def async_main():
     async with engine.begin() as conn:
