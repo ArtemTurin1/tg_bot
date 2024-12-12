@@ -5,7 +5,6 @@ from app.database.requests import get_materialcategoriis, get_materialcategoriis
 
 main = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Мой персонаж', callback_data='LK'),
                                         KeyboardButton(text = 'Ежедневные задания', callback_data='zadania')],
-                                        [KeyboardButton(text='Игра')],
                                         [KeyboardButton(text='Таблица лидеров'),
                                         KeyboardButton(text='Поддержка и предложения')]],
                            resize_keyboard=True,
@@ -48,18 +47,20 @@ leave = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Покинуть �
 donat = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="Пополнить 100 руб", callback_data="pay_100"),
-            InlineKeyboardButton(text="Пополнить 200 руб", callback_data="pay_200")
-        ]
+            InlineKeyboardButton(text="Пополнить 9 руб", callback_data="pay_9"),
+            InlineKeyboardButton(text="Пополнить 19 руб", callback_data="pay_19")],
+        [InlineKeyboardButton(text="Пополнить 39 руб", callback_data="pay_39"),
+            InlineKeyboardButton(text="Пополнить 59 руб", callback_data="pay_59")],
+        [InlineKeyboardButton(text="Оформить подписку 99 рублей", callback_data="pay_99")]
     ]
 )
 donat_life = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="3 жизни", callback_data="payl_3"),
-            InlineKeyboardButton(text="6 жизней", callback_data="payl_6")],
-            [InlineKeyboardButton(text="9 жизней", callback_data="payl_9"),
-            InlineKeyboardButton(text="12 жизней", callback_data="payl_12"),
+            InlineKeyboardButton(text="1 жизни", callback_data="payl_1"),
+            InlineKeyboardButton(text="3 жизней", callback_data="payl_3")],
+            [InlineKeyboardButton(text="6 жизней", callback_data="payl_6"),
+            InlineKeyboardButton(text="9 жизней", callback_data="payl_9"),
         ]
     ]
 )
@@ -91,4 +92,9 @@ async def materials(materialcat_id):
 async def glavn():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='На главную', callback_data='to_main'))
+    return keyboard.adjust(2).as_markup()
+
+async def leave_arena():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Прекратить поиск', callback_data='leave_arena'))
     return keyboard.adjust(2).as_markup()

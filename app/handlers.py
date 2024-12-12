@@ -1,6 +1,8 @@
 import asyncio
-from datetime import datetime, timedelta
 from gc import callbacks
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.date import DateTrigger
+from datetime import datetime, timedelta
 from app.database.models import User
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.types import Message, CallbackQuery
@@ -27,7 +29,7 @@ conn = sqlite3.connect('db.sqlite3')
 cursor = conn.cursor()
 bot = Bot(token='7882619849:AAF4WABwNdKvnQ39-mgh0STAztWMyD-VXpM')
 
-supports_canal = '-1002335317649'
+supports_canal = '-1002427853005'
 
 def is_number(s):
     try:
@@ -55,6 +57,49 @@ class Register(StatesGroup):
     number = State()
     tg_id = State()
 
+active_timers = {}
+
+async def reset_premium(user_id: int):
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == user_id))
+        if user:
+            user.premium = 0
+            await session.commit()
+            print(f"Премиум для пользователя {user_id} обнулён.")
+
+
+
+
+# Функция таймера для добавления попыток
+async def start_timer_for_attempts(user_id):
+    while True:
+        cursor.execute("SELECT count_otvet_x FROM users WHERE tg_id = ?", (user_id,))
+        count_otvet_x = int(cursor.fetchone()[0])
+        if count_otvet_x == 0:
+            count_otvet_x = 1
+        await asyncio.sleep(1 * 3600 / count_otvet_x)  # Таймер
+        conn.commit()
+        # Используем один запрос к базе данных с условным обновлением
+        cursor.execute("""
+                UPDATE users 
+                SET count_otvet = CASE 
+                                      WHEN count_otvet < 3 THEN count_otvet + 1  
+                                   END 
+                WHERE tg_id = ?;
+            """, (user_id,))
+        conn.commit()
+
+        # Эффективно проверяем обновленное значение после обновления
+        cursor.execute("SELECT count_otvet FROM users WHERE tg_id = ?", (user_id,))
+        count_otvet = int(cursor.fetchone()[0])
+
+        if count_otvet >= 3:
+            active_timers.pop(user_id, None)
+            break
+
+
+
+
 @router.message(F.photo)
 async def photo_handler(message: Message):
     photo_data = message.photo[-1]
@@ -68,7 +113,10 @@ async def cmd_start(message: Message, state: FSMContext):
     if any(user_id in pair for pair in active_games.keys()):
         await message.answer("Вы не можете использовать другие команды во время соревнования.")
         return
-    await message.answer(f'Приветствуем вас {message.from_user.full_name}.\nЭтот бот поможет вам подготовиться к экзаменам, или узнать что-то новое. Выберите одну из предложенных команд, для начала использования бота.', reply_markup = kb.main)
+    await message.answer(f'👋 Всем привет! Добро пожаловать в PLAYEX – вашего помощника в учебе! Мы понимаем, что подготовка к экзаменам может быть сложной и утомительной, особенно если ваш репетитор не объясняет задания так, как нужно.'
+                         f'\n\n📚 Устали от скучной учёбы? Плохо усваиваете материал? Не переживайте, мы здесь, чтобы помочь вам! '
+                         f'\n\n🎮 Занимайтесь подготовкой к ОГЭ и ЕГЭ с удовольствием, играя в нашем телеграм-боте! С нами вы сможете улучшить свои знания и навыки в игровой форме, что сделает процесс обучения увлекательным и эффективным. '
+                         f'\n\n✨ Присоединяйтесь к PLAYEX и начните свою захватывающую учебную приключение уже сегодня!', reply_markup = kb.main)
 
 @router.message(Command('help'))
 async def cmd_start(message: Message):
@@ -103,7 +151,7 @@ async def reg_login(message: Message, state: FSMContext):
                              'Пожалуйста, попробуй ещё раз.')
 
     elif user_loggin:
-        await message.answer('Пользователь с таким именем уже существует')
+        await message.answer('🚫 Упс! Пользователь с таким именем уже существует. Пожалуйста, выберите другое имя или попробуйте заново. Если вам нужна помощь, просто дайте знать! 😊')
     else:
         await state.update_data(login = message.text)
         await state.set_state(Register.age)
@@ -113,11 +161,11 @@ async def reg_login(message: Message, state: FSMContext):
 async def reg_age(message: Message, state: FSMContext):
 
     if not is_number(message.text):
-        await message.answer('Возраст нужно указать цифрами')
+        await message.answer('⚠️ Введите свой возраст цифрами. Пожалуйста, повторите попытку и убедитесь, что используете числа.')
     else:
         await state.update_data(age = message.text)
         await state.set_state(Register.whu)
-        await message.answer('Выберите кем вы хотите быть на платформе', reply_markup=kb.iam)
+        await message.answer('Пожалуйста, выбери свою роль на платформе: будешь учеником или учителем? Это поможет нам настроить твой опыт. Спасибо! 😊', reply_markup=kb.iam)
 
 @router.message(Register.whu)
 async def reg_whu(message: Message, state: FSMContext):
@@ -126,7 +174,7 @@ async def reg_whu(message: Message, state: FSMContext):
     else:
         await state.update_data(whu = message.text)
         await state.set_state(Register.number)
-        await message.answer('Отправьте ваш номер', reply_markup=kb.get_number)
+        await message.answer('📱 Пожалуйста, отправь свой номер телефона для регистрации. Это поможет нам создать твою учетную запись. Спасибо!', reply_markup=kb.get_number)
 
 @router.message(Register.number, F.contact)
 async def reg_number(message: Message, state: FSMContext):
@@ -134,11 +182,11 @@ async def reg_number(message: Message, state: FSMContext):
     await state.update_data(number=message.contact.phone_number)
     data = await state.get_data()
     global last_message
-    last_message = await message.answer(f'Регистрация успешно пройдена. Теперь ты можешь приступить к решению интересных задач.'
+    last_message = await message.answer(f'🎉 Поздравляю! Регистрация успешно завершена. Теперь ты готов начать решать интересные задачи! Удачи!'
                                         f'',reply_markup=kb.main)
     cursor.execute(
         "INSERT INTO users (tg_id, name, age, count_otvet, whuare, number, premium,balls,solved_tasks,balance,count_otvet_x,balls_x,level) VALUES (?,?,?,?, ?, ?, ?, ?,?,?,?,?,?)",
-        (data['tg_id'], data['login'], data['age'], 3, data['whu'], data['number'], 0,0,0,0,0,0,0,))
+        (data['tg_id'], data['login'], data['age'], 6, data['whu'], data['number'], 0,0,0,0,0,0,0,))
     conn.commit()
 
     await state.clear()
@@ -160,7 +208,7 @@ async def lk(message: Message):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
-        new_message = await message.answer('Вам нужно пройти регистрацию\n/register')
+        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
     else:
         new_message = await message.answer('Вы в личном кабинете', reply_markup=kb.lk)
     user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -183,7 +231,7 @@ async def daily_tasks(message: Message):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
-        new_message = await message.answer('Вам нужно пройти регистрацию\n/register')
+        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
     else:
         new_message = await message.answer('Выберите пункт', reply_markup=kb.zd)
     user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -214,7 +262,7 @@ async def daily_tasks_one(message: Message):
         new_message = await message.answer(f'Выбирите предмет', reply_markup=await kb.materialcategorii())
     else:
         new_message = await message.answer(
-            'Ваши попытки закончились\nВозвращайтесь завтра, чтобы решать новые задачи\nЧтобы решать задачи без ограничений, вы можете оформить подписку',
+            '🚫 Ваши попытки закончились.\nПодождите немого для востановления жизней\nЕсли хотите решать задачи без ограничений вы можете оформить подписку 😊',
             reply_markup=await kb.glavn())
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
@@ -263,12 +311,13 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
 
 @router.message(Otvetil.answer)
 async def his_answer(message: Message, state: FSMContext):
-    cursor.execute("SELECT count_otvet FROM users WHERE tg_id = ?",
-                   (message.from_user.id,))
+    cursor.execute("SELECT count_otvet FROM users WHERE tg_id = ?", (message.from_user.id,))
     result = cursor.fetchone()
-    count_otvet = int(result[0])
+    count_otvet = float(result[0]) if result else 0
     conn.commit()
     user_id = message.from_user.id
+
+    # Удаление сообщений пользователя
     await message.delete()
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
@@ -277,55 +326,68 @@ async def his_answer(message: Message, state: FSMContext):
             except Exception:
                 pass
         user_messages[user_id] = []
-    your_balls = 0
-    solved_tasks = 0
+
+    # Проверка ответа
     await state.update_data(answer=message.text)
     data = await state.get_data()
-    if data['vanswer'] == data['answer'] and count_otvet >1:
-        new_message = await message.answer('🎉Верный ответ🎉\nВы получаете 1 балл', reply_markup=await kb.materials(data['number']))
-        cursor.execute("SELECT balls, solved_tasks FROM users WHERE tg_id = ?",
-                       (message.from_user.id,))
+    if data['vanswer'] == data['answer'] and count_otvet > 1:
+        # Обновление при правильном ответе
+        cursor.execute("SELECT balls, solved_tasks, balls_x FROM users WHERE tg_id = ?", (user_id,))
         result = cursor.fetchone()
-        your_balls = int(result[0])
-        solved_tasks = int(result[1])
-        your_balls += 1
+        your_balls = int(result[2]) if result else 0
+        solved_tasks = int(result[1]) if result else 0
+        balls = float(result[0])
+        if your_balls > 0:
+            your_balls += your_balls
+        else:
+            your_balls += 1
         solved_tasks += 1
-        cursor.execute(
-            "UPDATE users SET balls = ? WHERE tg_id = ?",
-            (int(your_balls), message.from_user.id,))
-        cursor.execute(
-            "UPDATE users SET solved_tasks = ? WHERE tg_id = ?",
-            (int(solved_tasks), message.from_user.id,))
-        user_messages[user_id] = [message.message_id, new_message.message_id]
+        cursor.execute("UPDATE users SET balls = ?, solved_tasks = ? WHERE tg_id = ?", (your_balls, solved_tasks, user_id))
         conn.commit()
 
-
+        new_message = await message.answer(
+            f'🎉 Отлично! Верный ответ! 🎉\nВы получаете {your_balls}! Продолжайте в том же духе!',
+            reply_markup=await kb.materials(data['number'])
+        )
+        user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
     elif data['vanswer'] != data['answer'] and count_otvet > 1:
-        cursor.execute("UPDATE users SET count_otvet = count_otvet - 1 WHERE tg_id = ?",
-                       (user_id,))
-        cursor.execute("SELECT solved_tasks FROM users WHERE tg_id = ?",
-                       (message.from_user.id,))
-        result = cursor.fetchone()
-        solved_tasks = int(result[0])
-        solved_tasks += 1
-        cursor.execute(
-            "UPDATE users SET solved_tasks = ? WHERE tg_id = ?",
-            (int(solved_tasks), message.from_user.id,))
-
+        # Обновление при неправильном ответе
+        cursor.execute("UPDATE users SET count_otvet = count_otvet - 1 WHERE tg_id = ?", (user_id,))
         conn.commit()
-        await state.clear()
-        new_message = await message.answer(f'😿Ответ не верный😿\nколичество оставшихся попыток:{count_otvet}',
-                                    reply_markup=await kb.materials(data['number']))
+
+        cursor.execute("SELECT solved_tasks FROM users WHERE tg_id = ?", (user_id,))
+        solved_tasks = int(cursor.fetchone()[0])
+        solved_tasks += 1
+        cursor.execute("UPDATE users SET solved_tasks = ? WHERE tg_id = ?", (solved_tasks, user_id))
+        conn.commit()
+
+        new_message = await message.answer(
+            f'😿 Упс! Ответ неверный. 😿\nУ вас осталось {count_otvet - 1} попыток. Не отчаивайтесь и пробуйте снова! 💪',
+            reply_markup=await kb.materials(data['number'])
+        )
         user_messages[user_id] = [message.message_id, new_message.message_id]
+        await state.clear()
+
+        # Запуск таймера для добавления попыток, если его нет
+        if user_id not in active_timers:
+            active_timers[user_id] = asyncio.create_task(start_timer_for_attempts(user_id))
     else:
-         cursor.execute("UPDATE users SET count_otvet = 0 WHERE tg_id = ?",
-                        (user_id,))
-         await state.clear()
-         new_message = await message.answer('😿Ответ не верный😿\nВаши попытки закончились\nВозвращайтесь завтра, чтобы решать новые задачи\nЧтобы решать задачи без ограничений, вы можете оформить подписку',
-            reply_markup=await kb.glavn())
-         user_messages[user_id] = [message.message_id, new_message.message_id]
-         conn.commit()
+        # Обработка, если попытки закончились
+        cursor.execute("UPDATE users SET count_otvet = 0 WHERE tg_id = ?", (user_id,))
+        conn.commit()
+
+        new_message = await message.answer(
+            '😿 Ответ не верный 😿\n'
+            '🚫 Ваши попытки закончились.\nПодождите немого для востановления жизней\nЕсли хотите решать задачи без ограничений вы можете оформить подписку 😊',
+            reply_markup=await kb.glavn()
+        )
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+        await state.clear()
+
+        # Запуск таймера для добавления попыток, если его нет
+        if user_id not in active_timers:
+            active_timers[user_id] = asyncio.create_task(start_timer_for_attempts(user_id))
 
 @router.callback_query(F.data.startswith('to_main'))
 async def nazad(callback: CallbackQuery):
@@ -379,9 +441,10 @@ async def support(message: Message,state: FSMContext):
         user = await session.scalar(select(User).where(User.tg_id == user_id))
 
     if not user:
-        new_message = await message.answer('Вам нужно пройти регистрацию\n/register')
+        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
     else:
-        new_message = await message.answer('Расскажите нам о вашей проблеме, или предложении одним сообщением')
+        new_message = await message.answer('💬 Пожалуйста, расскажите нам о вашей проблеме или предложении в одном сообщении.\nМы рады помочь и ценим ваш отзыв!')
+
         await state.set_state(Support.ansversupport)
     user_messages[user_id] = [new_message.message_id]
 
@@ -392,7 +455,8 @@ async def supportansver(message: Message,state: FSMContext):
     data = await state.get_data()
     await message.forward(supports_canal)
     await message.answer(
-        f'Ваша проблема:\n{data['ansversupport']}\nНаш модератор скоро свяжется с вами для решения вашей проблемы')
+        f'Ваше сообщение:\n{data['ansversupport']}\n👤 Наш модератор вскоре свяжется с вами, чтобы помочь решить вашу проблему.\nСпасибо за ваше терпение!'
+        f'\n(Если вы хотите получить ответ лично, пожалуйста разрешите писать вам другим пользователям в телеграмме.')
     await state.clear()
 
 
@@ -413,7 +477,7 @@ async def support(message: Message):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
-        new_message = await message.answer('Вам нужно пройти регистрацию\n/register')
+        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
     else:
         top_balls_user = await get_liders()
         msg = ''
@@ -478,41 +542,49 @@ async def stats(message: Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-        cursor.execute("SELECT name, age, whuare, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
-                       (message.from_user.id,))
-        result = cursor.fetchone()
-        name = str(result[0])
-        age = int(result[1])
-        whuare = str(result[2])
-        number = int(result[3])
-        premium = int(result[4])
-        balls = int(result[5])
-        solved_tasks = int(result[6])
-        level = str(result[7])
-        count_otvet_x = str(result[8])
-        balls_x = str(result[9])
-        balance = str(result[10])
-        conn.commit()
-        your_premium = ''
-        if premium == 0:
-            your_premium = 'Подиска не активированна'
-        elif premium == 1:
-            your_premium = 'Подиска 1 уровня'
-        new_message = await message.answer(f'Никнейм: {name}({whuare})\n'
-                             f'Возраст: {age}\n'
-                             f'Телефон: {number}\n'
-                             f'Количество решенных задач: {solved_tasks}\n'
-                             f'Количество баллов: {balls}\n'
-                             f'Уровень: {level}\n'
-                             f'X к востановлению жизни: {count_otvet_x}\n'
-                             f'X к увеличению баллов: {balls_x}\n'
-                             f'Баланс: {balance}\n'
-                             f'{your_premium}', reply_markup=kb.lk)
+        async with async_session() as session:
+            user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
+        if not user:
+            new_message = await message.answer(
+                'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+        else:
+            cursor.execute("SELECT name, age, whuare, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
+                           (message.from_user.id,))
+            result = cursor.fetchone()
+            name = str(result[0])
+            age = int(result[1])
+            whuare = str(result[2])
+            number = int(result[3])
+            premium = int(result[4])
+            balls = int(result[5])
+            solved_tasks = int(result[6])
+            level = str(result[7])
+            count_otvet_x = str(result[8])
+            balls_x = str(result[9])
+            balance = str(result[10])
+            conn.commit()
+            your_premium = ''
+            if premium == 0:
+                your_premium = '🚫 Подписка не активирована.'
+            elif premium == 1:
+                your_premium = 'Подиска активна'
+            new_message = await message.answer(f'Никнейм: {name}({whuare})\n'
+                                 f'Возраст: {age}\n'
+                                 f'Телефон: {number}\n'
+                                 f'Количество решенных задач: {solved_tasks}\n'
+                                 f'Количество баллов: {balls}\n'
+                                 f'Уровень: {level}\n'
+                                 f'X к востановлению жизни: {count_otvet_x}\n'
+                                 f'X к увеличению баллов: {balls_x}\n'
+                                 f'Баланс: {balance}\n'
+                                 f'{your_premium}', reply_markup=kb.lk)
         user_messages[user_id] = [message.message_id, new_message.message_id]
+
 
 @router.message(Command('pay'))
 async def send_payment_options(message: types.Message):
     user_id = message.from_user.id
+
     if any(user_id in pair for pair in active_games.keys()):
         await message.answer("Вы не можете использовать другие команды во время соревнования.")
         return
@@ -524,7 +596,13 @@ async def send_payment_options(message: types.Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-    new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
+    if not user:
+        new_message = await message.answer(
+            'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+    else:
+        new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 @router.message(F.text == 'Донат')
@@ -543,6 +621,7 @@ async def send_payment_options(message: types.Message):
         user_messages[user_id] = []
     new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
     user_messages[user_id] = [message.message_id, new_message.message_id]
+
 
 @router.callback_query(lambda callback: callback.data.startswith("pay_"))
 async def send_invoice(callback: types.CallbackQuery):
@@ -569,10 +648,44 @@ async def process_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
 async def successful_payment(message: types.Message):
     payment_info = message.successful_payment
     amount = payment_info.total_amount / 100
-    cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?",
-                   (amount, message.from_user.id,))
-    conn.commit()
-    await message.answer(f"Оплата успешно проведена! Ваш баланс пополнен на {amount} руб.")
+    if amount == 99:
+        cursor.execute(
+            "SELECT premium FROM users WHERE tg_id = ?",
+            (message.from_user.id,))
+        result = cursor.fetchone()
+        premium_user = int(result[0])
+        if premium_user == 0:
+            cursor.execute("UPDATE users SET premium = 1 WHERE tg_id = ?",
+                           (message.from_user.id,))
+            conn.commit()
+            # Планировщик задачи на обнуление премиума через 30 дней
+            scheduler = AsyncIOScheduler()
+            reset_time = datetime.now() + timedelta(days=30)
+            scheduler.add_job(
+                reset_premium,
+                trigger=DateTrigger(run_date=reset_time),
+                kwargs={"user_id": message.from_user.id},
+            )
+            scheduler.start()
+
+            await message.answer(
+                "🎉 Подписка оформлена! Вы получили премиум на 1 месяц. Спасибо за поддержку!"
+            )
+        else:
+            cursor.execute("UPDATE users SET balance = balance + 99 WHERE tg_id = ?",
+                           (message.from_user.id,))
+            conn.commit()
+            await message.answer(
+                "У вас уже есть подписка, деньги зачислины вам на баланс"
+            )
+    else:
+
+
+
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?",
+                       (amount, message.from_user.id,))
+        conn.commit()
+        await message.answer(f" 🎉 Оплата успешно проведена!\nВаш баланс пополнен на {amount} руб. Спасибо за использование наших услуг!")
 
 
 @router.message(F.text == 'Жизни')
@@ -617,7 +730,7 @@ async def donat_life2(callback: types.CallbackQuery):
             return
 
         balance = int(result[0])
-        required_balance = {3: 19, 6: 28, 9: 35, 12: 45}.get(amount)
+        required_balance = {3: 19, 6: 28, 9: 35, 12: 47}.get(amount)
 
         if required_balance is None:
             await callback.answer("Ошибка: неверная сумма.", show_alert=True)
@@ -628,9 +741,9 @@ async def donat_life2(callback: types.CallbackQuery):
             cursor.execute("UPDATE users SET balance = ?, count_otvet = count_otvet + ? WHERE tg_id = ?",
                            (balance, amount, callback.from_user.id,))
             conn.commit()
-            await callback.answer(f"Успешно оплачено! С вашего баланса списано {required_balance}.", show_alert=True)
+            await callback.answer(f"🎉 Оплата прошла успешно!\nС вашего баланса списано {required_balance} руб.", show_alert=True)
         else:
-            await callback.answer(f"Недостаточно средств на балансе. Необходимо {required_balance}. Чтобы пополнить баланс воспользуйтесь /pay", show_alert=True)
+            await callback.answer(f"❌ Недостаточно средств на балансе.\nНеобходимо {required_balance} руб.\nЧтобы пополнить баланс, воспользуйтесь командой\n/pay.", show_alert=True)
     except Exception as e:
         await callback.answer(f"Произошла ошибка: {e}", show_alert=True)
 
@@ -656,13 +769,15 @@ async def ability(message: Message):
     balls_x = str(result[2])
     balance = int(result[3])
     balls = str(result[4])
-    new_message = await message.answer(f'Ваши способности:\n'
-                                 f'Количество жизней: {count_otvet}\n'
-                                 f'X к востановлению жизни: {count_otvet_x}\n'
-                                 f'X к увеличению баллов:{balls_x}\n'
+    new_message = await message.answer(f'Ваши характеристики:\n'
+                                 f'\nКоличество жизней: {count_otvet}\n'
+                                 f'Бонус к восстановлению жизни: {count_otvet_x}\n'
+                                 f'Бонус к увеличению баллов:{balls_x}\n'
                                  f'\nКоличество баллов:{balls}'
                                  f'\nБаланс: {balance}\n'
-                                 f'\nВыберите способность, которую хотите прокочать:', reply_markup=kb.ability)
+                                 f'\nВыберите, что прокачать:\n'
+                                 f'1. Восстановление жизни: Увеличьте количество жизней!\n'
+                                 f'2. Увеличение баллов: Получайте больше баллов за правильные ответы!\n\nВаш выбор?', reply_markup=kb.ability)
     user_messages[user_id] = [message.message_id, new_message.message_id]
     conn.commit()
 
@@ -683,20 +798,20 @@ async def ability(message: Message,state: FSMContext):
         cursor.execute("SELECT balls_x FROM users WHERE tg_id = ?",
                        (message.from_user.id,))
         result = cursor.fetchone()
-        balls_x = str(result[0])
+        balls_x = float(result[0])
         upgrade_costs_balls = {
-            0: (9, 1.2),  # count_otvet_x до 1.2 стоит 9 баллов
-            1.2: (19, 1.4),
-            1.4: (29, 1.8),
-            1.8: (39, 2.0),
+            0: (45, 1.2),
+            1.2: (75, 1.4),
+            1.4: (145, 1.8),
+            1.8: (225, 2.0),
         }
         next_level_cost_balls, next_level_value_balls = upgrade_costs_balls.get(float(balls_x),
                                                               (0, 0))
         upgrade_costs_pay = {
-            0: (19, 1.2),  # count_otvet_x до 1.2 стоит 9 баллов
-            1.2: (29, 1.4),
-            1.4: (39, 1.8),
-            1.8: (49, 2.0),
+            0: (9, 1.2),
+            1.2: (15, 1.4),
+            1.4: (29, 1.8),
+            1.8: (45, 2.0),
         }
         next_level_cost_pay, next_level_value_pay = upgrade_costs_pay.get(float(balls_x),
                                                                                 (0, 0))
@@ -711,7 +826,7 @@ async def ability(message: Message,state: FSMContext):
                 f'\nСледующее улучшение: {next_level_value_pay}'
                 f'\nСтоимость следующего улучшения за баллы: {next_level_cost_balls}'
                 f'\nСтоимость следующего улучшения за донат: {next_level_cost_pay}'
-                f'\nВыберите за каую валюту вы хотите прокачать способность(!!!после выбора ваши баллы(донат рубли) сразу спишуться с баланса!!!)',
+                f'\n💳 Выберите валюту, за которую хотите прокачать способность.\n⚠️ Внимание: после выбора ваши баллы (донат рубли) будут немедленно списаны с баланса!',
                 reply_markup=kb.pump)
         conn.commit()
         await state.set_state(Donat_xzizn.restoration_balls)
@@ -735,18 +850,18 @@ async def restoration_of_balls(message: Message,state: FSMContext):
     balls = int(result[1])
     balance = int(result[2])
     upgrade_costs_balls = {
-        0: (9, 1.2),
-        1.2: (19, 1.4),
-        1.4: (29, 1.8),
-        1.8: (39, 2.0),
+        0: (45, 1.2),
+        1.2: (75, 1.4),
+        1.4: (145, 1.8),
+        1.8: (225, 2.0),
     }
     next_level_cost_balls, next_level_value_balls = upgrade_costs_balls.get(float(balls_x),
                                                                             (0, 0))
     upgrade_costs_pay = {
-        0: (19, 1.2),
-        1.2: (29, 1.4),
-        1.4: (39, 1.8),
-        1.8: (49, 2.0),
+        0: (9, 1.2),
+        1.2: (15, 1.4),
+        1.4: (29, 1.8),
+        1.8: (45, 2.0),
     }
     next_level_cost_pay, next_level_value_pay = upgrade_costs_pay.get(float(balls_x),
                                                                       (0, 0))
@@ -770,7 +885,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
         else:
             new_message = await message.answer(
                 f"Недостаточно баллов для прокачки. У вас {balls} баллов. "
-                f"Стоимость следующей прокачки: {next_level_cost_balls} баллов." if next_level_cost_balls > 0 else "Максимальный уровень прокачки достигнут!",
+                f"Стоимость следующей прокачки: {next_level_cost_balls} баллов." if next_level_cost_balls > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -796,7 +911,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
         else:
             new_message = await message.answer(
                 f"Недостаточно баллов для прокачки. У вас {balance} баллов. "
-                f"Стоимость следующей прокачки: {next_level_cost_pay} баллов." if next_level_cost_pay > 0 else "Максимальный уровень прокачки достигнут!",
+                f"Стоимость следующей прокачки: {next_level_cost_pay} баллов." if next_level_cost_pay > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -823,26 +938,21 @@ async def restoration_of_life(message: Message,state: FSMContext):
         result = cursor.fetchone()
         count_otvet_x = str(result[0])
         upgrade_costs_balls1 = {
-            0: (9, 1.2),
-            1.2: (19, 1.4),
-            1.4: (29, 1.8),
-            1.8: (39, 2.0),
-            2.0: (49, 2.2),
-            2.2: (59, 2.4),
-            2.4: (69, 2.8),
-            2.8: (69, 3.0),
+            0: (25, 1.25),
+            1.25: (45, 1.5),
+            1.5: (99, 2.0),
+            2.0: (135, 2.5),
+            2.5: (160, 3.0),
+
         }
         next_level_cost_balls1, next_level_value_balls1 = upgrade_costs_balls1.get(float(count_otvet_x),
                                                                                 (0, 0))
         upgrade_costs_pay1 = {
-            0: (9, 1.2),
-            1.2: (19, 1.4),
-            1.4: (29, 1.8),
-            1.8: (39, 2.0),
-            2.0: (49, 2.2),
-            2.2: (59, 2.4),
-            2.4: (69, 2.8),
-            2.8: (69, 3.0),
+            0: (9, 1.25),
+            1.25: (15, 1.5),
+            1.5: (29, 2.0),
+            2.0: (35, 2.5),
+            2.5: (51, 3.0),
         }
         next_level_cost_pay1, next_level_value_pay1 = upgrade_costs_pay1.get(float(count_otvet_x),
                                                                           (0, 0))
@@ -857,7 +967,7 @@ async def restoration_of_life(message: Message,state: FSMContext):
                 f'\nСледующее улучшение: {next_level_value_pay1}'
                 f'\nСтоимость следующего улучшения за баллы: {next_level_cost_balls1}'
                 f'\nСтоимость следующего улучшения за донат: {next_level_cost_pay1}'
-                f'\nВыберите за каую валюту вы хотите прокачать способность(!!!после выбора ваши баллы(донат рубли) сразу спишуться с баланса!!!)',
+                f'\n💳 Выберите валюту, за которую хотите прокачать способность.\n⚠️ Внимание: после выбора ваши баллы (донат рубли) будут немедленно списаны с баланса!',
                 reply_markup=kb.pump)
         conn.commit()
         await state.set_state(Donat_xzizn.restoration_life)
@@ -881,27 +991,21 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
     balls = int(result[1])
     balance = int(result[2])
     upgrade_costs_balls1 = {
-        0: (9, 1.2),
-        1.2: (19, 1.4),
-        1.4: (29, 1.8),
-        1.8: (39, 2.0),
-        2.0: (49, 2.2),
-        2.2: (59, 2.4),
-        2.4: (69, 2.8),
-        2.8: (69, 3.0),
+        0: (25, 1.25),
+        1.25: (45, 1.5),
+        1.5: (99, 2.0),
+        2.0: (135, 2.5),
+        2.5: (160, 3.0),
     }
     next_level_cost_balls1, next_level_value_balls1 = upgrade_costs_balls1.get(count_otvet_x,
                                                                             (0, 0))
 
     upgrade_costs_pay1 = {
-        0: (9, 1.2),
-        1.2: (19, 1.4),
-        1.4: (29, 1.8),
-        1.8: (39, 2.0),
-        2.0: (49, 2.2),
-        2.2: (59, 2.4),
-        2.4: (69, 2.8),
-        2.8: (69, 3.0),
+        0: (9, 1.25),
+        1.25: (15, 1.5),
+        1.5: (29, 2.0),
+        2.0: (35, 2.5),
+        2.5: (51, 3.0),
     }
     next_level_cost_pay1, next_level_value_pay1 = upgrade_costs_pay1.get(count_otvet_x,
                                                                       (0, 0))
@@ -925,7 +1029,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
         else:
             new_message = await message.answer(
                 f"Недостаточно баллов для прокачки. У вас {balls} баллов. "
-                f"Стоимость следующей прокачки: {next_level_cost_balls1} баллов." if next_level_cost_balls1 > 0 else f"Максимальный уровень прокачки достигнут!", reply_markup=kb.ability
+                f"Стоимость следующей прокачки: {next_level_cost_balls1} баллов." if next_level_cost_balls1 > 0 else f"🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊", reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
@@ -949,7 +1053,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
         else:
             new_message = await message.answer(
                 f"Недостаточно баллов для прокачки. У вас {balance} баллов. "
-                f"Стоимость следующей прокачки: {next_level_cost_pay1} баллов." if next_level_cost_pay1 > 0 else "Максимальный уровень прокачки достигнут!",
+                f"Стоимость следующей прокачки: {next_level_cost_pay1} баллов." if next_level_cost_pay1 > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -962,20 +1066,19 @@ async def check_premium_arena(user_id):
                    (user_id,))
     result = cursor.fetchone()
     premium = int(result[0])
-    count_otvet = int(result[1])
+    count_otvet = float(result[1])
     conn.commit()
-    if premium == 0 and count_otvet == 0:
-        return False
+    if premium == 1:
+        return 1
+    if count_otvet >= 2.0 and premium == 0:
+        return 2
     else:
-        return True
+        return 0
 
 
 waiting_queue = {}
 active_games = {}
-
-# Список активных пользователей, которым нельзя отправлять команды
 active_players = set()
-
 
 @router.message(F.text == 'Арена')
 async def arena(message: Message):
@@ -994,27 +1097,39 @@ async def arena(message: Message):
                 pass
         user_messages[user_id] = []
 
-    if await check_premium_arena(user_id):
-        new_message = await message.answer(f'Выберите категорию материала', reply_markup=await kb.arenacatalog())
+    if await check_premium_arena(user_id) == 2:
+        new_message = await message.answer(
+            f'Выберите категорию материала',
+            reply_markup=await kb.arenacatalog())
         cursor.execute("UPDATE users SET count_otvet = count_otvet - 2 WHERE tg_id = ?", (message.from_user.id,))
         conn.commit()
+    elif await check_premium_arena(user_id) == 1:
+        new_message = await message.answer(f'Выберите категорию материала', reply_markup=await kb.arenacatalog())
     else:
-        new_message = await message.answer(f'У вас закончилились попытки\n'
-                                           f'Чтобы иметь неограниченный доступ к арене, вы можете оформить подписку',
-                                           reply_markup=await kb.main())
+        new_message = await message.answer(
+            f'🚫 У вас закончились попытки.\nЧтобы получить неограниченный доступ к арене, вы можете оформить подписку.',
+            reply_markup=kb.main)
     user_messages[user_id] = [message.message_id, new_message.message_id]
-
 
 @router.callback_query(F.data.startswith('arenacategory_'))
 async def select_category(callback: CallbackQuery):
     user_id = callback.from_user.id
     category = callback.data.split('_')[1]
 
+    if user_id in waiting_queue.get(category, []):
+        await callback.message.answer("Вы не можете соревноваться с самим собой.")
+        print(waiting_queue.get(category, []))
+        return
+
     if category not in waiting_queue:
         waiting_queue[category] = []
 
     if waiting_queue[category]:
         opponent_id = waiting_queue[category].pop(0)
+
+        if (user_id, opponent_id) in active_games or (opponent_id, user_id) in active_games:
+            await callback.message.answer("Ошибка: соперник уже находится в другой игре.")
+            return
 
         active_games[(user_id, opponent_id)] = {
             "category": category,
@@ -1024,81 +1139,13 @@ async def select_category(callback: CallbackQuery):
         active_players.add(user_id)
         active_players.add(opponent_id)
 
-        await bot.send_message(user_id, f"Соперник найден! Соревнование начинается.",reply_markup=await kb.leave())
-        await bot.send_message(opponent_id, f"Соперник найден! Соревнование начинается.",reply_markup=await kb.leave())
+        await bot.send_message(user_id, f'🏆 Соперник найден!\nСоревнование начинается! Удачи!', reply_markup=kb.leave)
+        await bot.send_message(opponent_id, f'🏆 Соперник найден!\nСоревнование начинается! Удачи!', reply_markup=kb.leave)
         await send_task(user_id, opponent_id, category)
     else:
         waiting_queue[category].append(user_id)
-        await callback.message.edit_text("Ожидаем соперника...",reply_markup=await kb.leave())
-
-
-
-
-async def send_task(user1_id, user2_id, category):
-    task = get_random_task(category)
-    if not task:
-        await bot.send_message(user1_id, "Ошибка: задачи отсутствуют в выбранной категории.")
-        await bot.send_message(user2_id, "Ошибка: задачи отсутствуют в выбранной категории.")
-        return
-    active_games[(user1_id, user2_id)]["tasks"].append(task)
-
-    try:
-
-        await bot.send_photo(user1_id, task['question'], caption="Ваша задача:")
-        await bot.send_photo(user2_id, task['question'], caption="Ваша задача:")
-    except Exception as e:
-        pass
-
-def get_random_task(category):
-    cursor.execute("SELECT id, photo, answer FROM photos WHERE materialcat = ? ORDER BY RANDOM() LIMIT 1;", (category,))
-    result = cursor.fetchone()
-    if result:
-        return {"id": result[0], "question": result[1], "answer": result[2]}
-    return None
-
-@router.message()
-async def handle_answer(message: Message):
-    user_id = message.from_user.id
-
-    # Проверяем, находится ли пользователь в активной игре
-    if user_id in active_players:
-        active_game = next(
-            ((game_data, user1, user2) for (user1, user2), game_data in active_games.items() if
-             user_id in (user1, user2)),
-            None,
-        )
-        if not active_game:
-            return
-
-        game_data, user1_id, user2_id = active_game
-        task = game_data["tasks"][-1]
-        opponent_id = user1_id if user_id == user2_id else user2_id
-
-        if message.text.strip() == task["answer"]:
-            game_data["scores"][user_id] += 1
-            cursor.execute("UPDATE users SET balls = balls + 1 WHERE tg_id = ?", (user_id,))
-            conn.commit()
-
-            await message.answer("🎉 Верно! Вы получили 1 балл.",reply_markup=await kb.leave())
-            await bot.send_message(opponent_id, "Ваш соперник ответил правильно.",reply_markup=await kb.leave())
-
-            if len(game_data["tasks"]) >= 3:
-                winner_id = max(game_data["scores"], key=game_data["scores"].get)
-                cursor.execute("SELECT name FROM users WHERE tg_id = ?", (winner_id,))
-                result = cursor.fetchone()
-                name = str(result[0])
-                scores = game_data["scores"]
-                await bot.send_message(user1_id, f"Игра окончена! Победитель: {name} с {scores[winner_id]} баллами.",reply_markup=await kb.main())
-                await bot.send_message(user2_id, f"Игра окончена! Победитель: {name} с {scores[winner_id]} баллами.",reply_markup=await kb.main())
-                active_players.remove(user1_id)
-                active_players.remove(user2_id)
-                del active_games[(user1_id, user2_id)]
-            else:
-                await send_task(user1_id, user2_id, game_data["category"])
-        else:
-            await message.answer("Ответ неверный")
-    else:
-        await message.answer("Вы не можете отправлять сообщения во время соревнования.")
+        await callback.message.edit_text(
+            "⏳ Ищем для вас подходящего соперника...", reply_markup=await kb.leave_arena())
 
 @router.message(F.text == 'Покинуть соревнование')
 async def leave_competition(message: Message):
@@ -1108,10 +1155,70 @@ async def leave_competition(message: Message):
         game_to_exit = next(((user1, user2) for (user1, user2) in active_games if user_id in (user1, user2)), None)
 
         if game_to_exit:
+            user1_id, user2_id = game_to_exit
             del active_games[game_to_exit]
+
             await message.answer("Вы вышли из игры. Вы можете использовать другие команды.", reply_markup=await kb.main())
-            active_players.remove(user_id)
+            opponent_id = user2_id if user_id == user1_id else user1_id
+            await bot.send_message(opponent_id, "👤 Ваш соперник покинул игру. Игра завершена.", reply_markup=kb.main)
+
+            active_players.discard(user1_id)
+            active_players.discard(user2_id)
         else:
-            await message.answer("Вы не участвуйте в игре.")
+            await message.answer("Вы не участвуете в игре.")
     else:
         await message.answer("Вы не находитесь в соревновании.")
+
+async def send_task(user1_id, user2_id, category):
+    task = get_random_task(category)
+    if not task:
+        await bot.send_message(user1_id, "Ошибка: задачи отсутствуют в выбранной категории.")
+        await bot.send_message(user2_id, "Ошибка: задачи отсутствуют в выбранной категории.")
+        return
+
+    # Добавляем задачу в активную игру
+    active_games[(user1_id, user2_id)]["tasks"].append(task)
+
+    try:
+        # Отправляем задачу обоим игрокам
+        await bot.send_message(user1_id, f"Ваша задача: {task['question']}")
+        await bot.send_message(user2_id, f"Ваша задача: {task['question']}")
+    except Exception as e:
+        await bot.send_message(user1_id, f"Ошибка отправки задачи: {e}")
+        await bot.send_message(user2_id, f"Ошибка отправки задачи: {e}")
+        return
+
+def get_random_task(category):
+    cursor.execute("SELECT id, question, answer FROM tasks WHERE category = ? ORDER BY RANDOM() LIMIT 1;", (category,))
+    result = cursor.fetchone()
+    if result:
+        return {"id": result[0], "question": result[1], "answer": result[2]}
+    return None
+
+@router.callback_query(F.data.startswith('leave_arena'))
+async def nazad(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    await callback.message.delete()
+
+    # Удаление из очереди поиска соперника
+    removed = False
+    for category, queue in waiting_queue.items():
+        if user_id in queue:
+            queue.remove(user_id)
+            removed = True
+            print(f"Игрок {user_id} удалён из очереди категории {category}.")
+            break
+
+
+    # Удаление сообщений пользователя
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await callback.message.bot.delete_message(chat_id=callback.message.chat.id, message_id=msg_id)
+            except Exception as e:
+                pass
+        user_messages[user_id] = []
+
+    # Уведомление пользователя
+    new_message = await callback.message.answer('Поиск соперника прекращен', reply_markup=kb.zd)
+    user_messages[user_id] = [callback.message.message_id, new_message.message_id]
