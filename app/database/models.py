@@ -26,8 +26,8 @@ class User(Base):
     solved_tasks: Mapped[int] = mapped_column()
     level: Mapped[int] = mapped_column()
     balance: Mapped[int] = mapped_column()
-
-
+    invited_count: Mapped[int] = mapped_column()
+    referral_nickname: Mapped[str] = mapped_column()
 
 
 

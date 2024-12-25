@@ -47,6 +47,7 @@ class Support(StatesGroup):
     zacl = State()
 class Otvetil(StatesGroup):
     vanswer = State()
+    id_num = State()
     answer = State()
     number = State()
 
@@ -56,6 +57,7 @@ class Register(StatesGroup):
     whu = State()
     number = State()
     tg_id = State()
+    referral = State()
 
 active_timers = {}
 
@@ -116,7 +118,7 @@ async def cmd_start(message: Message, state: FSMContext):
     await message.answer(f'👋 Всем привет! Добро пожаловать в PLAYEX – вашего помощника в учебе! Мы понимаем, что подготовка к экзаменам может быть сложной и утомительной, особенно если ваш репетитор не объясняет задания так, как нужно.'
                          f'\n\n📚 Устали от скучной учёбы? Плохо усваиваете материал? Не переживайте, мы здесь, чтобы помочь вам! '
                          f'\n\n🎮 Занимайтесь подготовкой к ОГЭ и ЕГЭ с удовольствием, играя в нашем телеграм-боте! С нами вы сможете улучшить свои знания и навыки в игровой форме, что сделает процесс обучения увлекательным и эффективным. '
-                         f'\n\n✨ Присоединяйтесь к PLAYEX и начните свою захватывающую учебную приключение уже сегодня!', reply_markup = kb.main)
+                         f'\n\n✨ Присоединяйтесь к PLAYEX и начните свое захватывающее учебное приключение уже сегодня!', reply_markup = kb.main)
 
 @router.message(Command('help'))
 async def cmd_start(message: Message):
@@ -131,14 +133,15 @@ async def cmd_start(message: Message):
 async def reg(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
         await state.set_state(Register.login)
         await state.update_data(tg_id = message.from_user.id)
-        await message.answer('Придумай себе крутой никнейм! Он появится в таблице лидеров, так что выбирай запоминающийся!',reply_markup=types.ReplyKeyboardRemove())
+        await message.answer('🎭Придумай себе крутой никнейм!\n'
+                             'Он появится в таблице лидеров, так что выбирай запоминающийся!',reply_markup=types.ReplyKeyboardRemove())
     else:
         await message.answer('Вы уже зарегистрированы')
 
@@ -147,25 +150,49 @@ async def reg_login(message: Message, state: FSMContext):
     async with async_session() as session:
         user_loggin = await session.scalar(select(User).where(User.name == message.text))
     if (len(message.text) > 15) or ('@' in message.text) or ('/' in message.text) or (' ' in message.text):
-        await message.answer('Кажется твой никнейм не подходит. Он должен содержать не более 15 символов и не может включать пробелы, а также символы / и @. '
-                             'Пожалуйста, попробуй ещё раз.')
+        await message.answer('🚫Кажется твой никнейм не подходит. Он должен содержать не более 15 символов и не может включать пробелы, а также символы / и @.🚫'
+                             '\nПожалуйста, попробуй ещё раз.')
 
     elif user_loggin:
         await message.answer('🚫 Упс! Пользователь с таким именем уже существует. Пожалуйста, выберите другое имя или попробуйте заново. Если вам нужна помощь, просто дайте знать! 😊')
     else:
         await state.update_data(login = message.text)
         await state.set_state(Register.age)
-        await message.answer('Введи свой возраст! Это поможет нам подобрать для тебя самые подходящие задания и сделать игру еще интереснее!')
+        await message.answer('👤Введи свой возраст! Это поможет нам подобрать для тебя самые подходящие задания и сделать игру еще интереснее!')
 
 @router.message(Register.age)
 async def reg_age(message: Message, state: FSMContext):
-
     if not is_number(message.text):
         await message.answer('⚠️ Введите свой возраст цифрами. Пожалуйста, повторите попытку и убедитесь, что используете числа.')
     else:
-        await state.update_data(age = message.text)
-        await state.set_state(Register.whu)
-        await message.answer('Пожалуйста, выбери свою роль на платформе: будешь учеником или учителем? Это поможет нам настроить твой опыт. Спасибо! 😊', reply_markup=kb.iam)
+        await state.update_data(age=message.text)
+        await state.set_state(Register.referral)
+        await message.answer('Если у вас есть реферальный никнейм друга, укажите его сейчас.\n'
+                             '❗Если нет, просто напишите "нет".')
+
+@router.message(Register.referral)
+async def reg_referral(message: Message, state: FSMContext):
+    referral_nickname = message.text
+    if referral_nickname.lower() == 'нет':
+        referral_nickname = None
+    else:
+        async with async_session() as session:
+            ref_user = await session.scalar(select(User).where(User.name == referral_nickname))
+            if not ref_user:
+                await message.answer('🚫 Указанный реферальный никнейм не существует. Пожалуйста, попробуйте ещё раз или напишите "нет".')
+                return
+            else:
+                # Увеличиваем счетчик приглашенных
+                ref_user.invited_count += 1
+                ref_user.balls += 20
+                session.add(ref_user)
+                await session.commit()
+                await message.answer(f'🎉 Вы указали реферала {referral_nickname}, и ему начислены бонусы!')
+
+    await state.update_data(referral_nickname=referral_nickname)
+    await state.set_state(Register.whu)
+    await message.answer('👨‍🎓Пожалуйста, выбери свою роль на платформе: будешь учеником или учителем?\nЭто поможет нам настроить твой опыт. Спасибо! 😊', reply_markup=kb.iam)
+
 
 @router.message(Register.whu)
 async def reg_whu(message: Message, state: FSMContext):
@@ -185,8 +212,10 @@ async def reg_number(message: Message, state: FSMContext):
     last_message = await message.answer(f'🎉 Поздравляю! Регистрация успешно завершена. Теперь ты готов начать решать интересные задачи! Удачи!'
                                         f'',reply_markup=kb.main)
     cursor.execute(
-        "INSERT INTO users (tg_id, name, age, count_otvet, whuare, number, premium,balls,solved_tasks,balance,count_otvet_x,balls_x,level) VALUES (?,?,?,?, ?, ?, ?, ?,?,?,?,?,?)",
-        (data['tg_id'], data['login'], data['age'], 6, data['whu'], data['number'], 0,0,0,0,0,0,0,))
+        "INSERT INTO users (tg_id, name, age, count_otvet, whuare, number, premium, balls, solved_tasks, balance, count_otvet_x, balls_x, level, referral_nickname, invited_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (data['tg_id'], data['login'], data['age'], 6, data['whu'], data['number'], 0, 0, 0, 0, 0, 0, 0,
+         data.get('referral_nickname'), 0)
+    )
     conn.commit()
 
     await state.clear()
@@ -195,7 +224,7 @@ async def reg_number(message: Message, state: FSMContext):
 async def lk(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -218,7 +247,7 @@ async def lk(message: Message):
 async def daily_tasks(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -241,7 +270,7 @@ async def daily_tasks(message: Message):
 async def daily_tasks_one(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     cursor.execute("SELECT count_otvet FROM users WHERE tg_id = ?",
                    (message.from_user.id,))
@@ -284,6 +313,7 @@ async def maretialcotegori(callback: CallbackQuery):
 @router.callback_query(F.data.startswith('material_'))
 async def materialcotegori(callback: CallbackQuery, state: FSMContext):
     user_id = callback.message.from_user.id
+    data = await state.get_data()
     await callback.message.delete()
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
@@ -298,7 +328,6 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
     await state.update_data(number=material_data.materialcat)
     rand_photo = []
     await callback.answer('Вы выбрали номер')
-    await callback.message.answer(f'Вы выбрали: {material_data.name}\n{material_data.description}\nВаше задание:', reply_markup= types.ReplyKeyboardRemove())
     for photo in photo_data:
         rand_photo.append(photo.photo)
     randomphoto = random.choice(rand_photo)
@@ -306,7 +335,11 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
     for i in photo_data2:
         if randomphoto == i.photo:
             await state.update_data(vanswer = i.answer)
+            id_num = i.id
     await state.set_state(Otvetil.answer)
+    await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
+                                  f'#{id_num} {material_data.description}\nВаше задание:',
+                                  reply_markup=types.ReplyKeyboardRemove())
     await callback.message.answer('Введите ответ:')
 
 @router.message(Otvetil.answer)
@@ -337,12 +370,13 @@ async def his_answer(message: Message, state: FSMContext):
         your_balls = int(result[2]) if result else 0
         solved_tasks = int(result[1]) if result else 0
         balls = float(result[0])
-        if your_balls > 0:
-            your_balls += your_balls
-        else:
-            your_balls += 1
         solved_tasks += 1
-        cursor.execute("UPDATE users SET balls = ?, solved_tasks = ? WHERE tg_id = ?", (your_balls, solved_tasks, user_id))
+        if your_balls > 0:
+            balls += your_balls
+        else:
+            your_balls = 1
+            balls += 1
+        cursor.execute("UPDATE users SET balls = ?, solved_tasks = ? WHERE tg_id = ?", (balls, solved_tasks, user_id))
         conn.commit()
 
         new_message = await message.answer(
@@ -354,6 +388,7 @@ async def his_answer(message: Message, state: FSMContext):
     elif data['vanswer'] != data['answer'] and count_otvet > 1:
         # Обновление при неправильном ответе
         cursor.execute("UPDATE users SET count_otvet = count_otvet - 1 WHERE tg_id = ?", (user_id,))
+
         conn.commit()
 
         cursor.execute("SELECT solved_tasks FROM users WHERE tg_id = ?", (user_id,))
@@ -423,7 +458,7 @@ async def menu(message: Message):
 async def support(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     user_id = message.from_user.id
     try:
@@ -464,7 +499,7 @@ async def supportansver(message: Message,state: FSMContext):
 async def support(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -513,7 +548,7 @@ async def gl(message: Message):
 async def back_button(message: types.Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -532,7 +567,7 @@ async def back_button(message: types.Message):
 async def stats(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -586,7 +621,7 @@ async def send_payment_options(message: types.Message):
     user_id = message.from_user.id
 
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -609,7 +644,7 @@ async def send_payment_options(message: types.Message):
 async def send_payment_options(message: types.Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -699,7 +734,7 @@ async def donat_life1(message: types.Message):
                 pass
         user_messages[user_id] = []
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
 
     await message.delete()
@@ -751,7 +786,7 @@ async def donat_life2(callback: types.CallbackQuery):
 async def ability(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -785,7 +820,7 @@ async def ability(message: Message):
 async def ability(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -923,7 +958,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
 async def restoration_of_life(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования.⛔")
         return
     await message.delete()
     if user_id in user_messages:
@@ -1086,7 +1121,7 @@ async def arena(message: Message):
     await message.delete()
 
     if user_id in active_players:
-        await message.answer("Вы уже находитесь в соревновании. Вы не можете использовать другие команды.")
+        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
         return
 
     if user_id in user_messages:
@@ -1158,38 +1193,33 @@ async def leave_competition(message: Message):
             user1_id, user2_id = game_to_exit
             del active_games[game_to_exit]
 
-            await message.answer("Вы вышли из игры. Вы можете использовать другие команды.", reply_markup=await kb.main())
+            await message.answer("⛓️‍💥Вы вышли из игры.⛓️‍💥", reply_markup=await kb.main())
             opponent_id = user2_id if user_id == user1_id else user1_id
-            await bot.send_message(opponent_id, "👤 Ваш соперник покинул игру. Игра завершена.", reply_markup=kb.main)
+            await bot.send_message(opponent_id, "👤 Ваш соперник покинул игру.\n⛓️‍💥Игра завершена.⛓️‍💥", reply_markup=kb.main)
 
             active_players.discard(user1_id)
             active_players.discard(user2_id)
         else:
-            await message.answer("Вы не участвуете в игре.")
+            await message.answer("⛔Вы не участвуете в игре.")
     else:
-        await message.answer("Вы не находитесь в соревновании.")
+        await message.answer("⛔Вы не находитесь в соревновании.")
 
 async def send_task(user1_id, user2_id, category):
     task = get_random_task(category)
     if not task:
-        await bot.send_message(user1_id, "Ошибка: задачи отсутствуют в выбранной категории.")
-        await bot.send_message(user2_id, "Ошибка: задачи отсутствуют в выбранной категории.")
+        print(user2_id, "Ошибка: задачи отсутствуют в выбранной категории.")
         return
-
-    # Добавляем задачу в активную игру
     active_games[(user1_id, user2_id)]["tasks"].append(task)
 
     try:
-        # Отправляем задачу обоим игрокам
-        await bot.send_message(user1_id, f"Ваша задача: {task['question']}")
-        await bot.send_message(user2_id, f"Ваша задача: {task['question']}")
+
+        await bot.send_photo(user1_id, task['question'], caption="Ваша задача:")
+        await bot.send_photo(user2_id, task['question'], caption="Ваша задача:")
     except Exception as e:
-        await bot.send_message(user1_id, f"Ошибка отправки задачи: {e}")
-        await bot.send_message(user2_id, f"Ошибка отправки задачи: {e}")
-        return
+        pass
 
 def get_random_task(category):
-    cursor.execute("SELECT id, question, answer FROM tasks WHERE category = ? ORDER BY RANDOM() LIMIT 1;", (category,))
+    cursor.execute("SELECT id, photo, answer FROM photos WHERE materialcat = ? ORDER BY RANDOM() LIMIT 1;", (category,))
     result = cursor.fetchone()
     if result:
         return {"id": result[0], "question": result[1], "answer": result[2]}
@@ -1220,5 +1250,9 @@ async def nazad(callback: CallbackQuery):
         user_messages[user_id] = []
 
     # Уведомление пользователя
-    new_message = await callback.message.answer('Поиск соперника прекращен', reply_markup=kb.zd)
+    new_message = await callback.message.answer('🚷Поиск соперника прекращен🚷', reply_markup=kb.zd)
     user_messages[user_id] = [callback.message.message_id, new_message.message_id]
+
+
+
+

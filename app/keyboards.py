@@ -87,7 +87,7 @@ async def materials(materialcat_id):
     for material in all_items:
         keyboard.add(InlineKeyboardButton(text=material.name, callback_data=f'material_{material.id}'))
     keyboard.add(InlineKeyboardButton(text='На главную', callback_data='to_main'))
-    return keyboard.adjust(2).as_markup()
+    return keyboard.adjust(3).as_markup()
 
 async def glavn():
     keyboard = InlineKeyboardBuilder()
