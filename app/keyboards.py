@@ -47,10 +47,10 @@ leave = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Покинуть �
 donat = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="Пополнить 9 руб", callback_data="pay_9"),
-            InlineKeyboardButton(text="Пополнить 19 руб", callback_data="pay_19")],
-        [InlineKeyboardButton(text="Пополнить 39 руб", callback_data="pay_39"),
-            InlineKeyboardButton(text="Пополнить 59 руб", callback_data="pay_59")],
+            #InlineKeyboardButton(text="Пополнить 9 руб", callback_data="pay_9"),
+            #InlineKeyboardButton(text="Пополнить 19 руб", callback_data="pay_19")],
+        InlineKeyboardButton(text="Пополнить 150 руб", callback_data="pay_150"),
+            InlineKeyboardButton(text="Пополнить 100 руб", callback_data="pay_100")],
         [InlineKeyboardButton(text="Оформить подписку 99 рублей", callback_data="pay_99")]
     ]
 )

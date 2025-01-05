@@ -126,8 +126,10 @@ async def cmd_start(message: Message):
     if any(user_id in pair for pair in active_games.keys()):
         await message.answer("Вы не можете использовать другие команды во время соревнования.")
         return
-    await message.answer('/start - Перезапуск бота\n'
-                         '/register - регестрация')
+    await message.answer('Если возник вопросы/проблемы связанные с ботом или появилось предложение по улучшению бота, то можно сообщить об этом в пункте Поддержка и предложения\n(если желаете получить обратную связь то откройте профиль в настройках телеграмма)\n'
+                         '\n/start - Перезапуск бота\n'
+                         '\n/register - регестрация\n'
+                         '\n/menu переход в главное меню\n')
 
 @router.message(Command('register'))
 async def reg(message: types.Message, state: FSMContext):
@@ -299,12 +301,10 @@ async def daily_tasks_one(message: Message):
 @router.callback_query(F.data.startswith('category_'))
 async def maretialcotegori(callback: CallbackQuery):
     await callback.answer(f'Вы выбрали  предмет')
-    await bot.edit_message_text(
-        chat_id=callback.message.chat.id,
-        message_id=callback.message.message_id,
-        text="Выберите номер",
-        reply_markup= await kb.materials(callback.data.split('_')[1])
-    )
+    await callback.message.edit_text(
+        "Выберите номер", reply_markup = await kb.materials(callback.data.split('_')[1]))
+
+
 
 
 
@@ -660,20 +660,37 @@ async def send_payment_options(message: types.Message):
 
 @router.callback_query(lambda callback: callback.data.startswith("pay_"))
 async def send_invoice(callback: types.CallbackQuery):
-    amount = int(callback.data.split("_")[1])
-    prices = [LabeledPrice(label=f"Пополнение баланса ({amount} руб)", amount=amount * 100)]
-    await callback.message.delete()
-    await bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title="Пополнение баланса",
-        description=f"Пополнение на {amount} руб",
-        payload=f"user_{callback.from_user.id}_{amount}",
-        provider_token=PAYMENT_PROVIDER_TOKEN,
-        currency="RUB",
-        prices=prices,
-        start_parameter="test-payment"
-    )
-    await callback.answer()
+    try:
+        # Получаем сумму из callback.data
+        amount1 = int(callback.data.split("_")[1])
+        print(f"Сумма для пополнения: {amount1}")
+
+        # Проверяем, чтобы сумма была корректной
+        if amount1 <= 0:
+            await callback.answer("Сумма должна быть больше 0!", show_alert=True)
+            return
+
+        # Подготовка цены в копейках
+        prices = [
+            LabeledPrice(label=f"Пополнение баланса ({amount1} руб)", amount=amount1 * 100)
+        ]
+        print(prices)
+        # Удаляем предыдущее сообщение и отправляем invoice
+        await callback.message.delete()
+        await bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            title="Пополнение баланса",
+            description=f"Пополнение на {amount1} руб",
+            payload=f"user_{callback.from_user.id}_{amount1}",  # Уникальный payload
+            provider_token=PAYMENT_PROVIDER_TOKEN,  # Токен Юкассы
+            currency="RUB",  # Валюта в формате ISO 4217
+            prices=prices,
+            start_parameter="pay",
+        )
+        await callback.answer()
+    except Exception as e:
+        print(f"Ошибка при отправке счета: {e}")
+        await callback.answer("Не удалось создать счет. Попробуйте позже.", show_alert=True)
 
 @router.pre_checkout_query()
 async def process_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
@@ -739,7 +756,7 @@ async def donat_life1(message: types.Message):
 
     await message.delete()
 
-    new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat_life)
+    new_message = await message.answer("Выберите количество жизней:", reply_markup=kb.donat_life)
 
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
@@ -765,7 +782,7 @@ async def donat_life2(callback: types.CallbackQuery):
             return
 
         balance = int(result[0])
-        required_balance = {3: 19, 6: 28, 9: 35, 12: 47}.get(amount)
+        required_balance = {1: 9, 3: 19, 6: 28, 9: 35}.get(amount)
 
         if required_balance is None:
             await callback.answer("Ошибка: неверная сумма.", show_alert=True)
@@ -945,7 +962,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
             )
         else:
             new_message = await message.answer(
-                f"Недостаточно баллов для прокачки. У вас {balance} баллов. "
+                f"Недостаточно денег для прокачки. У вас {balance} рублей. "
                 f"Стоимость следующей прокачки: {next_level_cost_pay} баллов." if next_level_cost_pay > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
@@ -1087,7 +1104,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             )
         else:
             new_message = await message.answer(
-                f"Недостаточно баллов для прокачки. У вас {balance} баллов. "
+                f"Недостаточно денег для прокачки. У вас {balance} рублей. "
                 f"Стоимость следующей прокачки: {next_level_cost_pay1} баллов." if next_level_cost_pay1 > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
