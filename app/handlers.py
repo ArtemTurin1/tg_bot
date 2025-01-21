@@ -19,7 +19,7 @@ from app.database.requests import get_liders
 from aiogram.types import LabeledPrice, PreCheckoutQuery
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
-PAYMENT_PROVIDER_TOKEN = "381764678:TEST:101677"
+PAYMENT_PROVIDER_TOKEN = "390540012:LIVE:62751"
 router = Router()
 import random
 
@@ -27,7 +27,7 @@ user_messages = {}
 
 conn = sqlite3.connect('db.sqlite3')
 cursor = conn.cursor()
-bot = Bot(token='7882619849:AAF4WABwNdKvnQ39-mgh0STAztWMyD-VXpM')
+bot = Bot(token='7885226501:AAFqfa4vmZ_FUOlAuSXa4-jUqcRriG7w1Qs')
 
 supports_canal = '-1002427853005'
 
@@ -107,6 +107,14 @@ async def photo_handler(message: Message):
     photo_data = message.photo[-1]
     await message.answer(f'{photo_data.file_id}')
 
+@router.message(F.document)
+async def document_handler(message: Message):
+    document = message.document  # Получаем объект документа
+    file_id = document.file_id  # Уникальный идентификатор файла
+    file_name = document.file_name  # Имя файла
+
+    await message.answer(f'Файл сохранен!\n\n📄 File ID: `{file_id}`\n📂 File Name: `{file_name}`', parse_mode="Markdown")
+
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
@@ -119,6 +127,9 @@ async def cmd_start(message: Message, state: FSMContext):
                          f'\n\n📚 Устали от скучной учёбы? Плохо усваиваете материал? Не переживайте, мы здесь, чтобы помочь вам! '
                          f'\n\n🎮 Занимайтесь подготовкой к ОГЭ и ЕГЭ с удовольствием, играя в нашем телеграм-боте! С нами вы сможете улучшить свои знания и навыки в игровой форме, что сделает процесс обучения увлекательным и эффективным. '
                          f'\n\n✨ Присоединяйтесь к PLAYEX и начните свое захватывающее учебное приключение уже сегодня!', reply_markup = kb.main)
+
+
+
 
 @router.message(Command('help'))
 async def cmd_start(message: Message):
@@ -301,6 +312,8 @@ async def daily_tasks_one(message: Message):
 @router.callback_query(F.data.startswith('category_'))
 async def maretialcotegori(callback: CallbackQuery):
     await callback.answer(f'Вы выбрали  предмет')
+
+
     await callback.message.edit_text(
         "Выберите номер", reply_markup = await kb.materials(callback.data.split('_')[1]))
 
@@ -323,24 +336,44 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
                 pass
         user_messages[user_id] = []
     material_data = await rq.get_material(callback.data.split('_')[1])
-    photo_data = await rq.get_photo(callback.data.split('_')[1])
-    photo_data2 = await rq.get_photo(callback.data.split('_')[1])
-    await state.update_data(number=material_data.materialcat)
-    rand_photo = []
-    await callback.answer('Вы выбрали номер')
-    for photo in photo_data:
-        rand_photo.append(photo.photo)
-    randomphoto = random.choice(rand_photo)
-    await callback.message.answer_photo(photo = randomphoto)
-    for i in photo_data2:
-        if randomphoto == i.photo:
-            await state.update_data(vanswer = i.answer)
-            id_num = i.id
-    await state.set_state(Otvetil.answer)
-    await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
-                                  f'#{id_num} {material_data.description}\nВаше задание:',
-                                  reply_markup=types.ReplyKeyboardRemove())
-    await callback.message.answer('Введите ответ:')
+    if material_data.materialcat == 2 and material_data.name == 'Номер 1-5':
+        file_data = await rq.get_photo(callback.data.split('_')[1])
+        file_data2 = await rq.get_photo(callback.data.split('_')[1])
+        await state.update_data(number=material_data.materialcat)
+        rand_file = []
+        await callback.answer('Вы выбрали номер')
+        for file in file_data:
+            rand_file.append((file.photo, file.answer, file.id))
+        random_file = random.choice(rand_file)
+
+        await state.update_data(vanswer= random_file[1])
+        id_num = random_file[2]
+        await state.set_state(Otvetil.answer)
+        await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
+                                      f'#{id_num} {material_data.description}\nВаше задание:',
+                                      reply_markup=types.ReplyKeyboardRemove())
+        await callback.message.answer_document(document=random_file[0])
+        await callback.message.answer('Введите ответ:')
+    else:
+
+        photo_data = await rq.get_photo(callback.data.split('_')[1])
+        photo_data2 = await rq.get_photo(callback.data.split('_')[1])
+        await state.update_data(number=material_data.materialcat)
+        rand_photo = []
+        await callback.answer('Вы выбрали номер')
+        for photo in photo_data:
+            rand_photo.append(photo.photo)
+        randomphoto = random.choice(rand_photo)
+        await callback.message.answer_photo(photo = randomphoto)
+        for i in photo_data2:
+            if randomphoto == i.photo:
+                await state.update_data(vanswer = i.answer)
+                id_num = i.id
+        await state.set_state(Otvetil.answer)
+        await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
+                                      f'#{id_num} {material_data.description}\nВаше задание:',
+                                      reply_markup=types.ReplyKeyboardRemove())
+        await callback.message.answer('Введите ответ:')
 
 @router.message(Otvetil.answer)
 async def his_answer(message: Message, state: FSMContext):
