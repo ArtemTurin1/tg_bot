@@ -1113,7 +1113,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             )
         else:
             new_message = await message.answer(
-                f"Недостаточно баллов для прокачки. У вас {balls} баллов. "
+                f"Недостаточно баллов для улучшения. У вас {balls} баллов. "
                 f"Стоимость следующей прокачки: {next_level_cost_balls1} баллов." if next_level_cost_balls1 > 0 else f"🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊", reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
