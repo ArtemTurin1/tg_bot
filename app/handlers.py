@@ -200,7 +200,7 @@ async def reg_referral(message: Message, state: FSMContext):
                 ref_user.balls += 20
                 session.add(ref_user)
                 await session.commit()
-                await message.answer(f'🎉 Вы указали реферала {referral_nickname}, и ему начислены бонусы!')
+                await message.answer(f'🎉 Вы указали партнёра {referral_nickname}, и ему начислены бонусы!')
 
     await state.update_data(referral_nickname=referral_nickname)
     await state.set_state(Register.whu)
