@@ -902,7 +902,7 @@ async def ability(message: Message,state: FSMContext):
                                                                                 (0, 0))
         if next_level_cost_balls <= 0:
             new_message = await message.answer(
-                f'На данный момент у вас X {balls_x} к востановлению баллов\n'
+                f'На данный момент ваш X {balls_x} к востановлению баллов\n'
                 f'Это максимальный уровень\n',
                 reply_markup=kb.pump)
         else:
