@@ -668,7 +668,7 @@ async def send_payment_options(message: types.Message):
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
         new_message = await message.answer(
-            'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+            'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \nЗаймёт всего минуту! 🚀\n/register')
     else:
         new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
     user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -770,7 +770,7 @@ async def successful_payment(message: types.Message):
         cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?",
                        (amount, message.from_user.id,))
         conn.commit()
-        await message.answer(f" 🎉 Оплата успешно проведена!\nВаш баланс пополнен на {amount} руб. Спасибо за использование наших услуг!")
+        await message.answer(f" 🎉 Оплата успешно проведена!\nВаш баланс пополнен на {amount} руб. \nСпасибо за использование наших услуг!")
 
 
 @router.message(F.text == 'Жизни')
