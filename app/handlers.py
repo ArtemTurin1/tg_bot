@@ -192,7 +192,7 @@ async def reg_referral(message: Message, state: FSMContext):
         async with async_session() as session:
             ref_user = await session.scalar(select(User).where(User.name == referral_nickname))
             if not ref_user:
-                await message.answer('🚫 Указанный реферальный никнейм не существует. Пожалуйста, попробуйте ещё раз или напишите "нет".')
+                await message.answer('🚫 Указанный никнейм не существует. Пожалуйста, попробуйте ещё раз или напишите "нет".')
                 return
             else:
                 # Увеличиваем счетчик приглашенных
