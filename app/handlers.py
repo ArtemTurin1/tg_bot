@@ -614,7 +614,7 @@ async def stats(message: Message):
             user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
         if not user:
             new_message = await message.answer(
-                'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+                'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \n Займёт всего минуту! 🚀\n/register')
         else:
             cursor.execute("SELECT name, age, whuare, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
                            (message.from_user.id,))
