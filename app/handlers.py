@@ -1107,7 +1107,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы прокачали X к востановлению жизни!\n"
+                f"Вы повысили X к востановлению жизни!\n"
                 f"Теперь вы будете получать за каждый ответ {count_otvet_x} балла.\n"
                 f"Оставшиеся баллы: {balls}", reply_markup=kb.ability
             )
