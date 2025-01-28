@@ -903,7 +903,7 @@ async def ability(message: Message,state: FSMContext):
         if next_level_cost_balls <= 0:
             new_message = await message.answer(
                 f'На данный момент ваш X {balls_x} к востановлению баллов\n'
-                f'Вы достигли максимального уровня\n',
+                f'Вы достигли максимального уровня!\n',
                 reply_markup=kb.pump)
         else:
             new_message = await message.answer(
@@ -963,7 +963,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы прокачали X к востановлению баллов!\n"
+                f"Вы увеличили X к востановлению баллов!\n"
                 f"Теперь вы будете получать за каждый ответ {balls_x} балла.\n"
                 f"Оставшиеся баллы: {balls}", reply_markup=kb.ability
             )
