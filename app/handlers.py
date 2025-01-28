@@ -250,7 +250,7 @@ async def lk(message: Message):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
-        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \nЗаймёт всего минуту! 🚀\n/register')
     else:
         new_message = await message.answer('Вы в личном кабинете', reply_markup=kb.lk)
     user_messages[user_id] = [message.message_id, new_message.message_id]
