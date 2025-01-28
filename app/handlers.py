@@ -1119,7 +1119,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
 
-    if message.text == 'За донат':
+    if message.text == 'За $':
         if next_level_cost_pay1 > 0 and balance >= next_level_cost_pay1:
             balance -= next_level_cost_pay1
             count_otvet_x = next_level_value_pay1
