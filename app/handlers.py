@@ -180,7 +180,7 @@ async def reg_age(message: Message, state: FSMContext):
     else:
         await state.update_data(age=message.text)
         await state.set_state(Register.referral)
-        await message.answer('Если у вас есть  никнейм друга, укажите его сейчас.\n'
+        await message.answer('Если у вас есть никнейм друга, который вас пригласил - укажите его сейчас.\n'
                              '❗Если нет, просто напишите "нет".')
 
 @router.message(Register.referral)
