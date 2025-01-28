@@ -1132,7 +1132,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             await state.clear()
             new_message = await message.answer(
                 f"Вы увеличили X к востановлению баллов!\n"
-                f"Теперь вы будете получать за каждый ответ {count_otvet_x} балла.\n"
+                f"Теперь вы  получаете за каждый ответ {count_otvet_x} балла.\n"
                 f"Оставшийся баланс: {balance}", reply_markup=kb.ability
             )
         else:
