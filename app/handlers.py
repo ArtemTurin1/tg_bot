@@ -1,5 +1,7 @@
 import asyncio
 from gc import callbacks
+from site import USER_BASE
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timedelta
@@ -19,6 +21,9 @@ from app.database.requests import get_liders
 from aiogram.types import LabeledPrice, PreCheckoutQuery
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
+
+from app.keyboards import form_redact
+
 PAYMENT_PROVIDER_TOKEN = "390540012:LIVE:62751"
 router = Router()
 import random
@@ -102,10 +107,10 @@ async def start_timer_for_attempts(user_id):
 
 
 
-@router.message(F.photo)
+'''@router.message(F.photo)
 async def photo_handler(message: Message):
     photo_data = message.photo[-1]
-    await message.answer(f'{photo_data.file_id}')
+    await message.answer(f'{photo_data.file_id}')'''
 
 @router.message(F.document)
 async def document_handler(message: Message):
@@ -114,6 +119,131 @@ async def document_handler(message: Message):
     file_name = document.file_name  # Имя файла
 
     await message.answer(f'Файл сохранен!\n\n📄 File ID: `{file_id}`\n📂 File Name: `{file_name}`', parse_mode="Markdown")
+
+
+@router.message(F.text == 'Добавить задание')
+async def add_task(message: Message):
+    cursor.execute("SELECT name FROM users WHERE tg_id = ?", (message.chat.id,))
+    result = cursor.fetchone()
+    name = str(result[0])
+    user_id = message.from_user.id
+    await message.delete()
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    if name[-1] == '💯':
+
+        new_message = await message.answer("Выберите задание, которое вы хотите добавить:", reply_markup= await kb.add_materialcategorii())
+
+    else:
+        new_message = await message.answer("Вы не можете добавлять задания(",
+                                           reply_markup=kb.main)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+class AddMaterial(StatesGroup):
+    id_material = State()
+    id_materialcat = State()
+    waiting_for_file_or_photo = State()
+    waiting_for_answer = State()
+
+@router.callback_query(F.data.startswith('task_'))
+async def task_selected(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(
+        f"Выберите номер", reply_markup=await kb.add_materials(callback.data.split('_')[1]))
+    await state.update_data(id_task=callback.data.split('_')[1])
+    await state.set_state(AddMaterial.id_material)
+
+
+
+
+@router.callback_query(AddMaterial.id_material, F.data.startswith('addmaterial_'))
+async def material_category(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.message.from_user.id
+    await callback.message.delete()
+
+    # Удаление старых сообщений пользователя
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await callback.message.bot.delete_message(chat_id=callback.message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+
+    # Получаем данные о материале
+    material_data = await rq.get_material(callback.data.split('_')[1])
+
+    # Определяем, нужно ли отправить файл или фото
+    if material_data.materialcat == 2 and material_data.name == 'Номер 1-5':
+        await callback.message.answer("Пришлите файл с заданием.")
+    else:
+        await callback.message.answer("Пришлите фото с заданием.")
+
+    # Сохранение типа материала в состояние
+    await state.update_data(id_material=callback.data.split('_')[1])
+
+    # Переключение FSM на ожидание файла или фото
+    await state.set_state(AddMaterial.waiting_for_file_or_photo)
+
+
+# Обработка получения файла или фото
+@router.message(AddMaterial.waiting_for_file_or_photo, F.content_type.in_({'photo', 'document'}))
+async def process_material(message: Message, state: FSMContext):
+    document = message.document  # Получаем объект документа
+
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        file_type = "photo"
+    elif message.document:
+        file_id = message.document.file_id
+        file_type = "document"
+    else:
+        await message.answer("Пожалуйста, отправьте фото или файл с заданием.")
+        return
+
+    # Сохраняем file_id в состояние
+    await state.update_data(file_id=file_id, file_type=file_type)
+
+    await message.answer("Файл получен! Теперь отправьте ваш ответ.")
+
+    # Переключение на ожидание ответа
+    await state.set_state(AddMaterial.waiting_for_answer)
+
+
+# Обработка ответа пользователя
+@router.message(AddMaterial.waiting_for_answer, F.text)
+async def process_answer(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    id_task = user_data['id_task']
+    id_material = user_data['id_material']
+    file_id = user_data['file_id']
+    answer = message.text
+
+    # Сохранение в базу данных (пример)
+    await save_to_database(id_task=id_task, id_material=id_material, file_id=file_id, answer=answer)
+
+    await message.answer("Ваше задание успешно сохранено в базе данных!")
+
+    # Завершаем FSM
+    await state.clear()
+
+
+async def save_to_database(id_task, id_material, file_id, answer):
+
+    cursor.execute("SELECT MAX(id) FROM photos")
+    result = cursor.fetchone()
+    max_id = int(result[0]) + 1
+    print(max_id, id_task, id_material, file_id, answer)
+    cursor.execute("""
+        INSERT INTO photos (id, photo, answer, material, materialcat)
+        VALUES (?, ?, ?, ?, ?)
+    """, (max_id, file_id, answer, id_material, id_task,))
+    conn.commit()
+
 
 
 @router.message(CommandStart())
@@ -203,11 +333,13 @@ async def reg_referral(message: Message, state: FSMContext):
                 await message.answer(f'🎉 Вы указали реферала {referral_nickname}, и ему начислены бонусы!')
 
     await state.update_data(referral_nickname=referral_nickname)
-    await state.set_state(Register.whu)
-    await message.answer('👨‍🎓Пожалуйста, выбери свою роль на платформе: будешь учеником или учителем?\nЭто поможет нам настроить твой опыт. Спасибо! 😊', reply_markup=kb.iam)
+    await state.set_state(Register.number)
+    await message.answer(
+        '📱 Пожалуйста, отправь свой номер телефона для регистрации. Это поможет нам создать твою учетную запись. Спасибо!',
+        reply_markup=kb.get_number)
 
 
-@router.message(Register.whu)
+'''@router.message(Register.whu)
 async def reg_whu(message: Message, state: FSMContext):
     if message.text != 'Учитель' and message.text != 'Ученик':
         await message.answer('Выберите один из предложенных выриантов')
@@ -215,7 +347,7 @@ async def reg_whu(message: Message, state: FSMContext):
         await state.update_data(whu = message.text)
         await state.set_state(Register.number)
         await message.answer('📱 Пожалуйста, отправь свой номер телефона для регистрации. Это поможет нам создать твою учетную запись. Спасибо!', reply_markup=kb.get_number)
-
+'''
 @router.message(Register.number, F.contact)
 async def reg_number(message: Message, state: FSMContext):
 
@@ -225,15 +357,15 @@ async def reg_number(message: Message, state: FSMContext):
     last_message = await message.answer(f'🎉 Поздравляю! Регистрация успешно завершена. Теперь ты готов начать решать интересные задачи! Удачи!'
                                         f'',reply_markup=kb.main)
     cursor.execute(
-        "INSERT INTO users (tg_id, name, age, count_otvet, whuare, number, premium, balls, solved_tasks, balance, count_otvet_x, balls_x, level, referral_nickname, invited_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (data['tg_id'], data['login'], data['age'], 6, data['whu'], data['number'], 0, 0, 0, 0, 0, 0, 0,
-         data.get('referral_nickname'), 0)
+        "INSERT INTO users (tg_id, name, age, count_otvet, number, premium, balls, solved_tasks, balance, count_otvet_x, balls_x, level, referral_nickname, invited_count, ban_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (data['tg_id'], data['login'], data['age'], 6, data['number'], 0, 0, 0, 0, 0, 0, 0,
+         data.get('referral_nickname'), 0,0)
     )
     conn.commit()
 
     await state.clear()
 
-@router.message(F.text == 'Мой персонаж')
+@router.message(F.text == 'Личный кабинет')
 async def lk(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
@@ -318,35 +450,35 @@ async def maretialcotegori(callback: CallbackQuery):
         "Выберите номер", reply_markup = await kb.materials(callback.data.split('_')[1]))
 
 
-
-
-
-
-
 @router.callback_query(F.data.startswith('material_'))
 async def materialcotegori(callback: CallbackQuery, state: FSMContext):
     user_id = callback.message.from_user.id
     data = await state.get_data()
-    await callback.message.delete()
-    if user_id in user_messages:
-        for msg_id in user_messages[user_id]:
-            try:
-                await callback.message.bot.delete_message(chat_id=callback.message.chat.id, message_id=msg_id)
-            except Exception:
-                pass
-        user_messages[user_id] = []
     material_data = await rq.get_material(callback.data.split('_')[1])
     if material_data.materialcat == 2 and material_data.name == 'Номер 1-5':
         file_data = await rq.get_photo(callback.data.split('_')[1])
         file_data2 = await rq.get_photo(callback.data.split('_')[1])
+
         await state.update_data(number=material_data.materialcat)
         rand_file = []
-        await callback.answer('Вы выбрали номер')
+
         for file in file_data:
             rand_file.append((file.photo, file.answer, file.id))
-        random_file = random.choice(rand_file)
 
-        await state.update_data(vanswer= random_file[1])
+        if len(rand_file) == 0:
+            await callback.answer("🚫 Заданий нет для выбранного номера и категории.")
+            return
+        if user_id in user_messages:
+            for msg_id in user_messages[user_id]:
+                try:
+                    await callback.message.bot.delete_message(chat_id=callback.message.chat.id, message_id=msg_id)
+                except Exception:
+                    pass
+            user_messages[user_id] = []
+        await callback.message.delete()
+
+        random_file = random.choice(rand_file)
+        await state.update_data(vanswer=random_file[1])
         id_num = random_file[2]
         await state.set_state(Otvetil.answer)
         await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
@@ -355,20 +487,35 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer_document(document=random_file[0])
         await callback.message.answer('Введите ответ:')
     else:
-
         photo_data = await rq.get_photo(callback.data.split('_')[1])
         photo_data2 = await rq.get_photo(callback.data.split('_')[1])
         await state.update_data(number=material_data.materialcat)
         rand_photo = []
-        await callback.answer('Вы выбрали номер')
+
+
         for photo in photo_data:
             rand_photo.append(photo.photo)
+
+        if len(rand_photo) == 0:
+            await callback.answer("🚫 Заданий нет для выбранного номера и категории.")
+            return
+        if user_id in user_messages:
+            for msg_id in user_messages[user_id]:
+                try:
+                    await callback.message.bot.delete_message(chat_id=callback.message.chat.id, message_id=msg_id)
+                except Exception:
+                    pass
+            user_messages[user_id] = []
+        await callback.message.delete()
         randomphoto = random.choice(rand_photo)
-        await callback.message.answer_photo(photo = randomphoto)
+        await callback.message.answer_photo(photo=randomphoto)
+
+        # Проверяем ответ для выбранного фото
         for i in photo_data2:
             if randomphoto == i.photo:
-                await state.update_data(vanswer = i.answer)
+                await state.update_data(vanswer=i.answer)
                 id_num = i.id
+
         await state.set_state(Otvetil.answer)
         await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
                                       f'#{id_num} {material_data.description}\nВаше задание:',
@@ -557,7 +704,7 @@ async def support(message: Message):
                 msg += f'{id_count}) {name_user} -- {balls_usser} балла(ов)\n'
             else:
                 break
-        new_message = await message.answer(f'Топ 10 пользователей:\n{msg}')
+        new_message = await message.answer(f'Топ 10 пользователей:\n{msg}', reply_markup= kb.main)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 @router.message(F.text == 'Вернуться в главное меню')
@@ -596,7 +743,7 @@ async def back_button(message: types.Message):
 
 
 
-@router.message(F.text == 'Статистика персонажа')
+@router.message(F.text == 'Статистика')
 async def stats(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
@@ -616,27 +763,26 @@ async def stats(message: Message):
             new_message = await message.answer(
                 'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
         else:
-            cursor.execute("SELECT name, age, whuare, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
+            cursor.execute("SELECT name, age, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
                            (message.from_user.id,))
             result = cursor.fetchone()
             name = str(result[0])
             age = int(result[1])
-            whuare = str(result[2])
-            number = int(result[3])
-            premium = int(result[4])
-            balls = int(result[5])
-            solved_tasks = int(result[6])
-            level = str(result[7])
-            count_otvet_x = str(result[8])
-            balls_x = str(result[9])
-            balance = str(result[10])
+            number = int(result[2])
+            premium = int(result[3])
+            balls = int(result[4])
+            solved_tasks = int(result[5])
+            level = str(result[6])
+            count_otvet_x = str(result[7])
+            balls_x = str(result[8])
+            balance = str(result[9])
             conn.commit()
             your_premium = ''
             if premium == 0:
                 your_premium = '🚫 Подписка не активирована.'
             elif premium == 1:
                 your_premium = 'Подиска активна'
-            new_message = await message.answer(f'Никнейм: {name}({whuare})\n'
+            new_message = await message.answer(f'Никнейм: {name}\n'
                                  f'Возраст: {age}\n'
                                  f'Телефон: {number}\n'
                                  f'Количество решенных задач: {solved_tasks}\n'
@@ -1276,7 +1422,7 @@ def get_random_task(category):
     return None
 
 @router.callback_query(F.data.startswith('leave_arena'))
-async def nazad(callback: CallbackQuery):
+async def leave_arena(callback: CallbackQuery):
     user_id = callback.from_user.id
     await callback.message.delete()
 
@@ -1289,8 +1435,6 @@ async def nazad(callback: CallbackQuery):
             print(f"Игрок {user_id} удалён из очереди категории {category}.")
             break
 
-
-    # Удаление сообщений пользователя
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
             try:
@@ -1299,10 +1443,525 @@ async def nazad(callback: CallbackQuery):
                 pass
         user_messages[user_id] = []
 
-    # Уведомление пользователя
     new_message = await callback.message.answer('🚷Поиск соперника прекращен🚷', reply_markup=kb.zd)
     user_messages[user_id] = [callback.message.message_id, new_message.message_id]
 
+@router.message(F.text == "Поиск Учителя/Ученика")
+async def profiles(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    new_message = await message.answer('Выберите один из пунктов', reply_markup=kb.form)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+
+class ProfileState(StatesGroup):
+    waiting_for_name = State()
+    waiting_for_name_tg = State()
+    waiting_for_role = State()  # Ученик или учитель
+    waiting_for_subject = State()  # Предмет подготовки
+    waiting_for_description = State()
+    waiting_for_photo = State()
+    editing_profile = State()
+    editing_name = State()
+    editing_role = State()
+    editing_description = State()
+    editing_subject = State()
+    editing_photo = State()
+
+@router.message(F.text == "Моя анкета")
+async def start_profile_creation(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    cursor.execute("SELECT * FROM profile_form WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if result:
+        cursor.execute("""
+                        SELECT id, name, role, subject, description, photo_id, likes, dislikes, is_active
+                        FROM profile_form
+                        WHERE user_id == ? 
+                    """,(user_id,))
+        profile = cursor.fetchone()
+        conn.commit()
+        if not profile:
+            new_message = await message.answer("Произошла ошибка")
+            return
+        profile_id, name, role, subject, description, photo_id, likes, dislikes, is_active = profile
+        status = "Анкета активна" if is_active == 1 else "Анкета не активна"
+        text = (
+            f"Ваша анкета:\n"
+            f"👤 *{name}* ({role})\n"
+            f"📚 Предмет: {subject}\n"
+            f"ℹ Описание: {description}\n"
+            f"❤️ Лайков: {likes}\n"
+            f"💔 Дизлайков: {dislikes}\n"
+            f"{status}"
+        )
+
+        new_message = await message.answer_photo(
+            photo=photo_id,
+            caption=text,
+            reply_markup=kb.form_menu,
+            parse_mode="Markdown"
+        )
 
 
 
+    else:
+        new_message = await message.answer("Давайте начнем создание вашей анкеты\nВведите ваше имя:")
+        await state.set_state(ProfileState.waiting_for_name)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(F.text == "Вернуться назад🔙")
+async def back(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    await profiles(message)
+
+
+
+@router.message(F.text == "Редактировать анкету")
+async def edit_profile(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    cursor.execute("SELECT * FROM profile_form WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        return
+
+
+    new_message = await message.answer("Что вы хотите изменить в анкете?", reply_markup=kb.form_redact)
+    await state.set_state(ProfileState.editing_profile)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.editing_profile)
+async def process_edit_choice(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    if message.text == "Имя":
+        new_message = await message.answer("Введите новое имя:")
+        await state.set_state(ProfileState.editing_name)
+    elif message.text == "Роль":
+        new_message = await message.answer("Выберите новую роль:", reply_markup=kb.iam)
+        await state.set_state(ProfileState.editing_role)
+    elif message.text == "Описание":
+        new_message = await message.answer("Введите новое описание:")
+        await state.set_state(ProfileState.editing_description)
+    elif message.text == "Предмет":
+        new_message = await message.answer("Введите новый предмет:", reply_markup = kb.form_tasks)
+        await state.set_state(ProfileState.editing_subject)
+    elif message.text == "Фото":
+        new_message = await message.answer("Отправьте новое фото:")
+        await state.set_state(ProfileState.editing_photo)
+    elif message.text == "Готово":
+        new_message = await message.answer("Изменения сохранены.", reply_markup=kb.form_redact)
+        await start_profile_creation(message, state)
+        await state.clear()
+    else:
+        new_message = await message.answer("Пожалуйста, выберите один из предложенных вариантов.")
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.editing_name)
+async def process_edit_name(message: types.Message, state: FSMContext):
+    new_name = message.text
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    cursor.execute("UPDATE profile_form SET name = ? WHERE user_id = ?", (new_name, user_id))
+    conn.commit()
+    new_message = await message.answer("Имя успешно обновлено.", reply_markup=kb.form_redact)
+    await state.set_state(ProfileState.editing_profile)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+
+@router.message(ProfileState.editing_role)
+async def process_edit_role(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if message.text not in ["Ученик", "Учитель", "Родитель"]:
+        new_message = await message.answer("Пожалуйста, выберите из предложенных вариантов: Ученик или Учитель.", reply_markup=kb.iam)
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+        return
+    else:
+        new_role = message.text
+        if user_id in user_messages:
+            for msg_id in user_messages[user_id]:
+                try:
+                    await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+                except Exception:
+                    pass
+            user_messages[user_id] = []
+        cursor.execute("UPDATE profile_form SET role = ? WHERE user_id = ?", (new_role, user_id))
+        conn.commit()
+        new_message = await message.answer("Ваша роль обновлена.", reply_markup=kb.form_redact)
+        await state.set_state(ProfileState.editing_profile)
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.editing_description)
+async def process_edit_description(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    new_description = message.text
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    cursor.execute("UPDATE profile_form SET description = ? WHERE user_id = ?", (new_description, user_id))
+    conn.commit()
+    new_message = await message.answer("Описание обновлено.", reply_markup=kb.form_redact)
+    await state.set_state(ProfileState.editing_profile)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.editing_subject)
+async def process_edit_subject(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if message.text not in ['Математика Профиль/База', 'Математика ОГЭ', "Информатика", "Русский", "Биология", "Английский язык"]:
+        new_message = await message.answer("Пожалуйста, выберите из предложенных вариантов.", reply_markup = kb.form_tasks)
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+        return
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    new_subject = message.text
+    cursor.execute("UPDATE profile_form SET subject = ? WHERE user_id = ?", (new_subject, user_id))
+    conn.commit()
+    new_message = await message.answer("Выбран новый предмет", reply_markup=kb.form_redact)
+    await state.set_state(ProfileState.editing_profile)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.editing_photo)
+async def process_edit_photo(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    new_photo = message.text
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    cursor.execute("UPDATE profile_form SET photo = ? WHERE user_id = ?", (new_photo, user_id))
+    conn.commit()
+    new_message = await message.answer("Фото обновлено.", reply_markup=kb.form_redact)
+    await state.set_state(ProfileState.editing_profile)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.waiting_for_name)
+async def process_name(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    await state.update_data(name=message.text)
+    new_message = await message.answer("Выберите вашу роль:", reply_markup=kb.iam)
+    await state.set_state(ProfileState.waiting_for_name_tg)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+
+@router.message(ProfileState.waiting_for_name_tg)
+async def process_name(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    if message.text not in ["Ученик", "Учитель", "Родитель"]:
+        new_message = await message.answer("Пожалуйста, выберите из предложенных вариантов: Ученик или Учитель.", reply_markup=kb.iam)
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+        return
+    await state.update_data(role=message.text)
+    new_message = await message.answer("Отправьте имя своего профиля(чтобы с вами моги связаться)\nбез @", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(ProfileState.waiting_for_role)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.waiting_for_role)
+async def process_role(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    await state.update_data(name_tg=message.text)
+    new_message = await message.answer("Введите предмет, по которому вы обучаетесь или готовите:", reply_markup = kb.form_tasks)
+    await state.set_state(ProfileState.waiting_for_subject)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.waiting_for_subject)
+async def process_subject(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    if message.text not in ['Математика Профиль/База', 'Математика ОГЭ', "Информатика", "Русский", "Биология", "Английский язык"]:
+        new_message = await message.answer("Пожалуйста, выберите из предложенных вариантов.", reply_markup = kb.form_tasks)
+        user_messages[user_id] = [message.message_id, new_message.message_id]
+        return
+    await state.update_data(subject=message.text)
+    new_message = await message.answer("Расскажите немного о себе:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(ProfileState.waiting_for_description)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.waiting_for_description)
+async def process_description(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    await state.update_data(description=message.text)
+    new_message = await message.answer("Теперь отправьте ваше фото:")
+    await state.set_state(ProfileState.waiting_for_photo)
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(ProfileState.waiting_for_photo, F.photo)
+async def process_photo(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+    photo_id = message.photo[-1].file_id
+    user_data = await state.get_data()
+    user = message.from_user.id
+    cursor.execute("SELECT MAX(id) FROM profile_form")
+    result = cursor.fetchone()
+    max_id = int(result[0]) + 1
+    cursor.execute("SELECT age FROM users WHERE tg_id = ?;", (user,))
+    result = cursor.fetchone()
+    age = int(result[0])
+    cursor.execute("""
+        INSERT INTO profile_form (id, user_id, name, name_tg, role, subject, description, photo_id, age, likes, is_active) 
+        VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (max_id, message.from_user.id, user_data['name'],user_data['name_tg'], user_data['role'], user_data['subject'], user_data['description'], photo_id, int(age), 0, 1))
+    conn.commit()
+
+    new_message = await message.answer("Анкета успешно сохранена! Другие пользователи могут её просмотреть.", reply_markup=kb.form)
+    await state.clear()
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+@router.message(F.text == "Удалить анкету из поиска")
+async def deactivate_profile(message: types.Message):
+    user_id = message.from_user.id
+    cursor.execute("SELECT * FROM profile_form WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        return
+
+    cursor.execute("UPDATE profile_form SET is_active = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    await start_profile_creation(message, None)
+
+
+@router.message(F.text == "Добавить анкету в поиск")
+async def activate_profile(message: types.Message):
+    user_id = message.from_user.id
+    cursor.execute("SELECT * FROM profile_form WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        return
+
+    cursor.execute("UPDATE profile_form SET is_active = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    await start_profile_creation(message, None)
+
+
+@router.message(F.text == "Начать поиск")
+async def view_profiles(message: types.Message, state: FSMContext):
+    await show_next_profile(message, message.from_user.id, state)
+
+
+async def show_next_profile(message: types.Message, user_id: int, state: FSMContext = None):
+    cursor.execute("SELECT role FROM profile_form WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        await message.answer("Сначала создайте свою анкету, чтобы просматривать других пользователей.")
+        return
+
+    user_role = result[0]
+
+    if user_role == "Учитель":
+        query = """
+            SELECT id, name, role, subject, description, photo_id, likes, dislikes
+            FROM profile_form
+            WHERE role IN ('Ученик', 'Родитель') AND user_id != ? AND is_active = 1
+            ORDER BY RANDOM()
+            LIMIT 1
+        """
+    elif user_role == "Ученик":
+        query = """
+            SELECT id, name, role, subject, description, photo_id, likes, dislikes
+            FROM profile_form
+            WHERE role = 'Учитель' AND user_id != ? AND is_active = 1
+            ORDER BY RANDOM()
+            LIMIT 1
+        """
+    else:
+        await message.answer("Ваша роль не позволяет просматривать другие анкеты.")
+        return
+
+    cursor.execute(query, (user_id,))
+    profile = cursor.fetchone()
+
+    if not profile:
+        await message.answer("Подходящих анкет больше нет.")
+        return
+    profile_id, name, role, subject, description, photo_id, likes, dislikes = profile
+
+    text = (
+        f"👤 *{name}* ({role})\n"
+        f"📚 Предмет: {subject}\n"
+        f"ℹ Описание: {description}\n"
+        f"❤️ Лайков: {likes}\n"
+        f"💔 Дизлайков: {dislikes}"
+    )
+
+    await message.answer_photo(
+        photo=photo_id,
+        caption=text,
+        reply_markup=kb.get_profile_keyboard(profile_id),
+        parse_mode="Markdown"
+    )
+
+
+@router.callback_query(F.data == "skip")
+async def skip_profile(callback: CallbackQuery):
+    await callback.message.delete()
+    await show_next_profile(callback.message, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("like_"))
+async def like_profile(callback: CallbackQuery):
+    profile_id = int(callback.data.split("_")[1])
+    user_id = callback.from_user.id
+
+    cursor.execute("SELECT action FROM votes WHERE user_id = ? AND profile_id = ?", (user_id, profile_id))
+    vote = cursor.fetchone()
+
+    if vote:
+        await callback.answer("Вы уже голосовали за эту анкету.")
+        return
+
+    cursor.execute("UPDATE profile_form SET likes = likes + 1 WHERE id = ?", (profile_id,))
+    cursor.execute("INSERT INTO votes (user_id, profile_id, action) VALUES (?, ?, 'like')", (user_id, profile_id))
+    conn.commit()
+
+    await callback.answer("Вы поставили лайк!")
+    await callback.message.delete()
+    await show_next_profile(callback.message, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("dislike_"))
+async def dislike_profile(callback: CallbackQuery):
+    profile_id = int(callback.data.split("_")[1])
+    user_id = callback.from_user.id
+    cursor.execute("SELECT action FROM votes WHERE user_id = ? AND profile_id = ?", (user_id, profile_id))
+    vote = cursor.fetchone()
+
+    if vote:
+        await callback.answer("Вы уже голосовали за эту анкету.")
+        return
+    cursor.execute("UPDATE profile_form SET dislikes = dislikes + 1 WHERE id = ?", (profile_id,))
+    cursor.execute("INSERT INTO votes (user_id, profile_id, action) VALUES (?, ?, 'dislike')", (user_id, profile_id))
+    conn.commit()
+
+    await callback.answer("Вы поставили дизлайк.")
+    await callback.message.delete()
+    await show_next_profile(callback.message, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("contact_"))
+async def contact_profile(callback: CallbackQuery):
+    profile_id = int(callback.data.split("_")[1])
+    await callback.message.delete()
+    cursor.execute("SELECT user_id, name_tg FROM profile_form WHERE id = ?", (profile_id,))
+    profile = cursor.fetchone()
+
+    if not profile:
+        await callback.answer("Анкета не найдена.")
+        return
+
+    owner_id = profile[0]
+    user_name_tg = profile[1]
+    username = callback.from_user.username
+    contact_info = f"@{username}" if username else f"ID: {callback.from_user.id}"
+
+    await callback.bot.send_message(
+        owner_id,
+        f"С вами хочет связаться пользователь {contact_info}!"
+    )
+    await callback.answer("Связываемся с пользователем...")
+    await callback.message.answer(f"Контакт для связи: @{user_name_tg}",
+                                  reply_markup=await kb.continue_button())
+
+@router.callback_query(F.data == "continue_profiles")
+async def continue_profiles(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    await callback.message.delete()
+    await show_next_profile(callback.message, user_id)

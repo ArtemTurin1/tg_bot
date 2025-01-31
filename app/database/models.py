@@ -16,7 +16,6 @@ class User(Base):
     tg_id: Mapped[BigInteger] = mapped_column(BigInteger)
     name: Mapped[str] = mapped_column()
     age: Mapped[int] = mapped_column()
-    whuare: Mapped[str] = mapped_column()
     number: Mapped[str] = mapped_column(String(25))
     count_otvet: Mapped[int] = mapped_column()
     count_otvet_x: Mapped[float] = mapped_column()
@@ -28,7 +27,7 @@ class User(Base):
     balance: Mapped[int] = mapped_column()
     invited_count: Mapped[int] = mapped_column()
     referral_nickname: Mapped[str] = mapped_column()
-
+    ban_time: Mapped[int] = mapped_column()
 
 
 class Materialcat(Base):
