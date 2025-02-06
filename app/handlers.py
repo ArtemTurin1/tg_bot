@@ -433,7 +433,7 @@ async def daily_tasks_one(message: Message):
         user_messages[user_id] = []
     if count_otvet > 0:
 
-        new_message = await message.answer(f'Выбирите предмет', reply_markup=await kb.materialcategorii())
+        new_message = await message.answer(f'🎯 Выбирите предмет 🎯', reply_markup=await kb.materialcategorii())
     else:
         new_message = await message.answer(
             '🚫 Ваши попытки закончились.\nПодождите немого для востановления жизней\nЕсли хотите решать задачи без ограничений вы можете оформить подписку 😊',
