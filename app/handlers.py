@@ -466,7 +466,7 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
             rand_file.append((file.photo, file.answer, file.id))
 
         if len(rand_file) == 0:
-            await callback.answer("🚫 Заданий нет для выбранного номера и категории.")
+            await callback.answer("🚫 Заданий нет для выбранного номера и категории 🚫")
             return
         if user_id in user_messages:
             for msg_id in user_messages[user_id]:
