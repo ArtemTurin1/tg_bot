@@ -481,7 +481,7 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
         await state.update_data(vanswer=random_file[1])
         id_num = random_file[2]
         await state.set_state(Otvetil.answer)
-        await callback.message.answer(f'Вы выбрали: {material_data.name}\n'
+        await callback.message.answer(f'Вы выбрали: {material_data.name} ✅\n'
                                       f'#{id_num} {material_data.description}\nВаше задание:',
                                       reply_markup=types.ReplyKeyboardRemove())
         await callback.message.answer_document(document=random_file[0])
