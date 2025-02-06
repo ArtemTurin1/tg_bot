@@ -616,7 +616,7 @@ async def nazad(callback: CallbackQuery):
                 pass
         user_messages[user_id] = []
     await callback.answer('🕎 Вы перешли в главное меню 🕎')
-    new_message = await callback.message.answer('Вы перешли в главное меню', reply_markup= kb.main)
+    new_message = await callback.message.answer('🕎 Вы перешли в главное меню 🕎', reply_markup= kb.main)
     user_messages[user_id] = [callback.message.message_id, new_message.message_id]
 
 @router.message(Command('menu'))
