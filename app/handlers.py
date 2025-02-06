@@ -497,7 +497,7 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
             rand_photo.append(photo.photo)
 
         if len(rand_photo) == 0:
-            await callback.answer("🚫 Заданий нет для выбранного номера и категории.")
+            await callback.answer("🚫Заданий нет для выбранного номера и категории 🚫")
             return
         if user_id in user_messages:
             for msg_id in user_messages[user_id]:
@@ -560,7 +560,7 @@ async def his_answer(message: Message, state: FSMContext):
         conn.commit()
 
         new_message = await message.answer(
-            f'🎉 Отлично! Верный ответ! 🎉\nВы получаете {your_balls}! Продолжайте в том же духе!',
+            f'🎉 Отлично! Верный ответ! 🎉\nВы получаете {your_balls}! Продолжайте в том же духе❗️',
             reply_markup=await kb.materials(data['number'])
         )
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -578,7 +578,7 @@ async def his_answer(message: Message, state: FSMContext):
         conn.commit()
 
         new_message = await message.answer(
-            f'😿 Упс! Ответ неверный. 😿\nУ вас осталось {count_otvet - 1} попыток. Не отчаивайтесь и пробуйте снова! 💪',
+            f'😿 Упс! Ответ неверный. 😿\nУ вас осталось {count_otvet - 1} попыток. Не отчаивайтесь и пробуйте снова❗️',
             reply_markup=await kb.materials(data['number'])
         )
         user_messages[user_id] = [message.message_id, new_message.message_id]
