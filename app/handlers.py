@@ -634,11 +634,11 @@ async def menu(message: Message):
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 
-@router.message(F.text == 'Поддержка и предложения')
+@router.message(F.text == 'Поддержка и предложения 🤝')
 async def support(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("⛔ Вы не можете использовать другие команды во время соревнования ⛔")
         return
     user_id = message.from_user.id
     try:
@@ -656,9 +656,9 @@ async def support(message: Message,state: FSMContext):
         user = await session.scalar(select(User).where(User.tg_id == user_id))
 
     if not user:
-        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+        new_message = await message.answer('Ого❗️ Кажется, ты еще не в нашей команде❗️\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту 🚀\n/register')
     else:
-        new_message = await message.answer('💬 Пожалуйста, расскажите нам о вашей проблеме или предложении в одном сообщении.\nМы рады помочь и ценим ваш отзыв!')
+        new_message = await message.answer('💬 Пожалуйста, расскажите нам о вашей проблеме или предложении в одном сообщении.\nМы рады помочь и ценим ваш отзыв❗️')
 
         await state.set_state(Support.ansversupport)
     user_messages[user_id] = [new_message.message_id]
@@ -670,7 +670,7 @@ async def supportansver(message: Message,state: FSMContext):
     data = await state.get_data()
     await message.forward(supports_canal)
     await message.answer(
-        f'Ваше сообщение:\n{data['ansversupport']}\n👤 Наш модератор вскоре свяжется с вами, чтобы помочь решить вашу проблему.\nСпасибо за ваше терпение!'
+        f'Ваше сообщение:\n{data['ansversupport']}\n👤 Наш модератор вскоре свяжется с вами, чтобы помочь решить вашу проблему.\nСпасибо за ваше терпение 🤝'
         f'\n(Если вы хотите получить ответ лично, пожалуйста разрешите писать вам другим пользователям в телеграмме.')
     await state.clear()
 
@@ -679,7 +679,7 @@ async def supportansver(message: Message,state: FSMContext):
 async def support(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -692,7 +692,7 @@ async def support(message: Message):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
-        new_message = await message.answer('Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту! 🚀\n/register')
+        new_message = await message.answer('Ого❗️ Кажется, ты еще не в нашей команде❗️\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. Займёт всего минуту❗️ 🚀\n/register')
     else:
         top_balls_user = await get_liders()
         msg = ''
@@ -701,7 +701,14 @@ async def support(message: Message):
         for name_user, balls_usser in top_balls_user:
             id_count += 1
             if id_count <= max_users_balls:
-                msg += f'{id_count}) {name_user} -- {balls_usser} балла(ов)\n'
+                if id_count == 1:
+                    msg += f'🥇 👤{name_user} -- {balls_usser} 🪙)\n'
+                if id_count == 2:
+                    msg += f'🥈 👤{name_user} -- {balls_usser} 🪙\n'
+                if id_count == 3:
+                    msg += f'🥉 👤{name_user} -- {balls_usser} 🪙\n'
+                msg += f'№{id_count}) 👤{name_user} -- {balls_usser} 🪙\n'
+
             else:
                 break
         new_message = await message.answer(f'Топ 10 пользователей:\n{msg}', reply_markup= kb.main)
@@ -711,7 +718,7 @@ async def support(message: Message):
 async def gl(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("Вы не можете использовать другие команды во время соревнования.")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -721,14 +728,14 @@ async def gl(message: Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-    new_message = await message.answer('Вы перешли в главное меню', reply_markup= kb.main)
+    new_message = await message.answer('🕎 Вы перешли в главное меню 🕎', reply_markup= kb.main)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 @router.message(F.text == 'Вернуться назад')
 async def back_button(message: types.Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -738,7 +745,7 @@ async def back_button(message: types.Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-        new_message = await message.answer("Вы вернулись назад", reply_markup=kb.lk)
+        new_message = await message.answer("Вы вернулись назад ↩️", reply_markup=kb.lk)
         user_messages[user_id] = [message.message_id, new_message.message_id]
 
 
@@ -747,7 +754,7 @@ async def back_button(message: types.Message):
 async def stats(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -761,7 +768,7 @@ async def stats(message: Message):
             user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
         if not user:
             new_message = await message.answer(
-                'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \n Займёт всего минуту! 🚀\n/register')
+                'Ого❗️ Кажется, ты еще не в нашей команде❗️\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \n Займёт всего минуту 🚀\n/register')
         else:
             cursor.execute("SELECT name, age, number, premium, balls, solved_tasks,level, count_otvet_x, balls_x, balance FROM users WHERE tg_id = ?",
                            (message.from_user.id,))
@@ -786,10 +793,10 @@ async def stats(message: Message):
                                  f'Возраст: {age}\n'
                                  f'Телефон: {number}\n'
                                  f'Количество решенных задач: {solved_tasks}\n'
-                                 f'Количество баллов: {balls}\n'
+                                 f'Количество 🪙: {balls}\n'
                                  f'Уровень: {level}\n'
                                  f'X к востановлению жизни: {count_otvet_x}\n'
-                                 f'X к увеличению баллов: {balls_x}\n'
+                                 f'X к увеличению 🪙: {balls_x}\n'
                                  f'Баланс: {balance}\n'
                                  f'{your_premium}', reply_markup=kb.lk)
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -800,7 +807,7 @@ async def send_payment_options(message: types.Message):
     user_id = message.from_user.id
 
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -814,16 +821,16 @@ async def send_payment_options(message: types.Message):
         user = await session.scalar(select(User).where(User.tg_id == message.from_user.id))
     if not user:
         new_message = await message.answer(
-            'Ого! Кажется, ты еще не в нашей команде!\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \nЗаймёт всего минуту! 🚀\n/register')
+            'Ого❗️ Кажется, ты еще не в нашей команде❗️\n😉 Чтобы начать пользоваться ботом, тебе нужно пройти быструю регистрацию. \nЗаймёт всего минуту 🚀\n/register')
     else:
         new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
-@router.message(F.text == 'Донат')
+@router.message(F.text == '💲')
 async def send_payment_options(message: types.Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -833,7 +840,7 @@ async def send_payment_options(message: types.Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-    new_message = await message.answer("Выберите сумму для пополнения:", reply_markup=kb.donat)
+    new_message = await message.answer("💳 Выберите сумму для пополнения 💳", reply_markup=kb.donat)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 
@@ -846,7 +853,7 @@ async def send_invoice(callback: types.CallbackQuery):
 
         # Проверяем, чтобы сумма была корректной
         if amount1 <= 0:
-            await callback.answer("Сумма должна быть больше 0!", show_alert=True)
+            await callback.answer("Сумма должна быть больше 0️⃣❕", show_alert=True)
             return
 
         # Подготовка цены в копейках
@@ -900,14 +907,14 @@ async def successful_payment(message: types.Message):
             scheduler.start()
 
             await message.answer(
-                "🎉 Подписка оформлена! Вы получили премиум на 1 месяц. Спасибо за поддержку!"
+                "🎉 Подписка оформлена  🎉\n❗Вы получили премиум на 1 месяц. Спасибо за поддержку❗"
             )
         else:
             cursor.execute("UPDATE users SET balance = balance + 99 WHERE tg_id = ?",
                            (message.from_user.id,))
             conn.commit()
             await message.answer(
-                "У вас уже есть подписка, деньги зачислины вам на баланс"
+                "У вас уже есть подписка, деньги зачислены вам на баланс 💲"
             )
     else:
 
@@ -916,7 +923,7 @@ async def successful_payment(message: types.Message):
         cursor.execute("UPDATE users SET balance = balance + ? WHERE tg_id = ?",
                        (amount, message.from_user.id,))
         conn.commit()
-        await message.answer(f" 🎉 Оплата успешно проведена!\nВаш баланс пополнен на {amount} руб. \nСпасибо за использование наших услуг!")
+        await message.answer(f" 🎉 Оплата успешно проведена 🎉\nВаш баланс пополнен на {amount} руб. \nСпасибо за использование наших услуг❗")
 
 
 @router.message(F.text == 'Жизни')
@@ -930,7 +937,7 @@ async def donat_life1(message: types.Message):
                 pass
         user_messages[user_id] = []
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
 
     await message.delete()
@@ -972,7 +979,7 @@ async def donat_life2(callback: types.CallbackQuery):
             cursor.execute("UPDATE users SET balance = ?, count_otvet = count_otvet + ? WHERE tg_id = ?",
                            (balance, amount, callback.from_user.id,))
             conn.commit()
-            await callback.answer(f"🎉 Оплата прошла успешно!\nС вашего баланса списано {required_balance} руб.", show_alert=True)
+            await callback.answer(f"🎉 Оплата прошла успешно 🎉\nС вашего баланса списано {required_balance} руб.", show_alert=True)
         else:
             await callback.answer(f"❌ Недостаточно средств на балансе.\nНеобходимо {required_balance} руб.\nЧтобы пополнить баланс, воспользуйтесь командой\n/pay.", show_alert=True)
     except Exception as e:
@@ -1003,16 +1010,16 @@ async def ability(message: Message):
     new_message = await message.answer(f'Ваши характеристики:\n'
                                  f'\nКоличество жизней: {count_otvet}\n'
                                  f'Бонус к восстановлению жизни: {count_otvet_x}\n'
-                                 f'Бонус к увеличению баллов:{balls_x}\n'
-                                 f'\nКоличество баллов:{balls}'
+                                 f'Бонус к увеличению 🪙:{balls_x}\n'
+                                 f'\nКоличество 🪙:{balls}'
                                  f'\nБаланс: {balance}\n'
                                  f'\nВыберите, что прокачать:\n'
                                  f'1. Восстановление жизни: Увеличьте количество жизней!\n'
-                                 f'2. Увеличение баллов: Получайте больше баллов за правильные ответы!\n\nВаш выбор?', reply_markup=kb.ability)
+                                 f'2. Увеличение 🪙: Получайте больше 🪙 за правильные ответы!\n\nВаш выбор?', reply_markup=kb.ability)
     user_messages[user_id] = [message.message_id, new_message.message_id]
     conn.commit()
 
-@router.message(F.text == 'X к увеличению баллов')
+@router.message(F.text == 'X к увеличению 🪙')
 async def ability(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
@@ -1048,16 +1055,16 @@ async def ability(message: Message,state: FSMContext):
                                                                                 (0, 0))
         if next_level_cost_balls <= 0:
             new_message = await message.answer(
-                f'На данный момент ваш X {balls_x} к востановлению баллов\n'
+                f'На данный момент ваш X {balls_x} к востановлению 🪙\n'
                 f'Вы достигли максимального уровня!\n',
                 reply_markup=kb.pump)
         else:
             new_message = await message.answer(
-                f'На данный момент у вас X {balls_x} к востановлению баллов'
+                f'На данный момент у вас X {balls_x} к востановлению 🪙'
                 f'\nСледующее улучшение: {next_level_value_pay}'
-                f'\nСтоимость следующего улучшения за баллы: {next_level_cost_balls}'
-                f'\nСтоимость следующего улучшения за донат: {next_level_cost_pay}'
-                f'\n💳 Выберите валюту, за которую хотите прокачать способность.\n⚠️ Внимание: после выбора ваши баллы (донат рубли) будут немедленно списаны с баланса!',
+                f'\nСтоимость следующего улучшения за 🪙: {next_level_cost_balls}'
+                f'\nСтоимость следующего улучшения за 💲: {next_level_cost_pay}'
+                f'\n💳 Выберите валюту, за которую хотите улучшить способность.\n⚠️ Внимание: после выбора ваши 🪙 (донат рубли) будут немедленно списаны с баланса!',
                 reply_markup=kb.pump)
         conn.commit()
         await state.set_state(Donat_xzizn.restoration_balls)
@@ -1097,7 +1104,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
     next_level_cost_pay, next_level_value_pay = upgrade_costs_pay.get(float(balls_x),
                                                                       (0, 0))
 
-    if message.text == 'За баллы':
+    if message.text == 'За 🪙':
         if next_level_cost_balls > 0 and balls >= next_level_cost_balls:
             balls -= next_level_cost_balls
             balls_x = next_level_value_balls
@@ -1109,21 +1116,21 @@ async def restoration_of_balls(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы увеличили X к востановлению баллов!\n"
-                f"Теперь вы будете получать за каждый ответ {balls_x} балла.\n"
-                f"Оставшиеся баллы: {balls}", reply_markup=kb.ability
+                f"Вы увеличили X к востановлению 🪙!\n"
+                f"Теперь вы будете получать за каждый ответ {balls_x} 🪙.\n"
+                f"Оставшиеся 🪙: {balls}", reply_markup=kb.ability
             )
         else:
             new_message = await message.answer(
-                f"Недостаточно баллов для улучшения. У вас {balls} баллов. "
-                f"Стоимость следующего улучшения: {next_level_cost_balls} баллов." if next_level_cost_balls > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
+                f"Недостаточно 🪙 для улучшения. У вас {balls} 🪙. "
+                f"Стоимость следующего улучшения: {next_level_cost_balls} 🪙." if next_level_cost_balls > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
 
 
-    if message.text == 'За донат':
+    if message.text == 'За 💲':
         if next_level_cost_pay > 0 and balance >= next_level_cost_pay:
             balance -= next_level_cost_pay
             balls_x = next_level_value_pay
@@ -1135,14 +1142,14 @@ async def restoration_of_balls(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы прокачали X к востановлению баллов!\n"
-                f"Теперь вы будете получать за каждый ответ {balls_x} балла.\n"
+                f"Вы прокачали X к востановлению 🪙!\n"
+                f"Теперь вы будете получать за каждый ответ {balls_x} 🪙.\n"
                 f"Оставшийся баланс: {balance}", reply_markup=kb.ability
             )
         else:
             new_message = await message.answer(
                 f"Недостаточно денег для улучшения. У вас {balance} рублей. "
-                f"Стоимость следующей улучшения: {next_level_cost_pay} баллов." if next_level_cost_pay > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
+                f"Стоимость следующей улучшения: {next_level_cost_pay} 🪙." if next_level_cost_pay > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -1189,16 +1196,16 @@ async def restoration_of_life(message: Message,state: FSMContext):
                                                                           (0, 0))
         if next_level_cost_balls1 <= 0:
             new_message = await message.answer(
-                f'На данный момент у вас X {count_otvet_x} к востановлению баллов\n'
+                f'На данный момент у вас X {count_otvet_x} к востановлению 🪙\n'
                 f'Это максимальный уровень\n',
                 reply_markup=kb.pump)
         else:
             new_message = await message.answer(
                 f'На данный момент у вас X {count_otvet_x} к востановлению жизней'
                 f'\nСледующее улучшение: {next_level_value_pay1}'
-                f'\nСтоимость следующего улучшения за баллы: {next_level_cost_balls1}'
+                f'\nСтоимость следующего улучшения за 🪙: {next_level_cost_balls1}'
                 f'\nСтоимость следующего улучшения за $: {next_level_cost_pay1}'
-                f'\n💳 Выберите валюту, за которую хотите улучшить способность.\n⚠️ Внимание: после выбора ваши баллы (донат рубли) будут немедленно списаны с баланса!',
+                f'\n💳 Выберите валюту, за которую хотите улучшить способность.\n⚠️ Внимание: после выбора ваши 🪙 (донат рубли) будут немедленно списаны с баланса!',
                 reply_markup=kb.pump)
         conn.commit()
         await state.set_state(Donat_xzizn.restoration_life)
@@ -1240,7 +1247,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
     }
     next_level_cost_pay1, next_level_value_pay1 = upgrade_costs_pay1.get(count_otvet_x,
                                                                       (0, 0))
-    if message.text == 'За баллы':
+    if message.text == 'За 🪙':
 
         if next_level_cost_balls1 > 0 and balls >= next_level_cost_balls1:
             balls -= next_level_cost_balls1
@@ -1254,13 +1261,13 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             await state.clear()
             new_message = await message.answer(
                 f"Вы повысили X к востановлению жизни!\n"
-                f"Теперь вы  получаете за каждый ответ {count_otvet_x} балла.\n"
-                f"Оставшиеся баллы: {balls}", reply_markup=kb.ability
+                f"Теперь вы  получаете за каждый ответ {count_otvet_x} 🪙.\n"
+                f"Оставшиеся 🪙: {balls}", reply_markup=kb.ability
             )
         else:
             new_message = await message.answer(
-                f"Недостаточно баллов для улучшения. У вас {balls} баллов. "
-                f"Стоимость следующей улучшения: {next_level_cost_balls1} баллов." if next_level_cost_balls1 > 0 else f"🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊", reply_markup=kb.ability
+                f"Недостаточно 🪙 для улучшения. У вас {balls} 🪙. "
+                f"Стоимость следующей улучшения: {next_level_cost_balls1} 🪙." if next_level_cost_balls1 > 0 else f"🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊", reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
@@ -1277,14 +1284,14 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы увеличили X к востановлению баллов!\n"
-                f"Теперь вы  получаете за каждый ответ {count_otvet_x} балла.\n"
+                f"Вы увеличили X к востановлению 🪙!\n"
+                f"Теперь вы  получаете за каждый ответ {count_otvet_x} 🪙.\n"
                 f"Оставшийся баланс: {balance}", reply_markup=kb.ability
             )
         else:
             new_message = await message.answer(
                 f"Недостаточно $ для улучшения. У вас {balance} рублей. "
-                f"Стоимость следующего улучшения: {next_level_cost_pay1} баллов." if next_level_cost_pay1 > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
+                f"Стоимость следующего улучшения: {next_level_cost_pay1} 🪙." if next_level_cost_pay1 > 0 else "🎯 Вы достигли максимального уровня! Поздравляем!\nДальше вас ждут новые возможности и достижения. 😊",
                 reply_markup=kb.ability
             )
         user_messages[user_id] = [message.message_id, new_message.message_id]

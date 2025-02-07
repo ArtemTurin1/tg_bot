@@ -13,7 +13,7 @@ main = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Личный каб
 
 form = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Начать поиск')],
                                         [KeyboardButton(text = 'Моя анкета'),
-                                       KeyboardButton(text = 'Лайкнутые анкеты')]],
+                                       KeyboardButton(text = 'Понравившиеся анкеты')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 
@@ -26,7 +26,7 @@ form_menu = ReplyKeyboardMarkup(keyboard=[
                            input_field_placeholder='Выберите пункт...')
 
 lk = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Статистика'),
-                                       KeyboardButton(text = 'Прокачать способности')],
+                                       KeyboardButton(text = 'Изменить способности способности')],
                                      [KeyboardButton(text = 'Вернуться в главное меню')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
@@ -46,14 +46,14 @@ zd = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Решать зада
                            input_field_placeholder='Выберите пункт...')
 
 ability = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='X к востановлению жизни')],
-                                       [KeyboardButton(text = 'X к увеличению баллов')],
+                                       [KeyboardButton(text = 'X к увеличению 🪙')],
                                         [KeyboardButton(text = 'Жизни'),
-                                         KeyboardButton(text = 'Донат')],
+                                         KeyboardButton(text = '💲')],
                                           [KeyboardButton(text = 'Вернуться назад')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
-pump = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='За баллы'),
-                                       KeyboardButton(text = 'За донат')],
+pump = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='За 🪙'),
+                                       KeyboardButton(text = 'За 💲')],
                                        [KeyboardButton(text = 'Вернуться назад')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
