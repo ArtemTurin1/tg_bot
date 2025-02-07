@@ -985,11 +985,11 @@ async def donat_life2(callback: types.CallbackQuery):
     except Exception as e:
         await callback.answer(f"Произошла ошибка: {e}", show_alert=True)
 
-@router.message(F.text == 'Прокачать способности')
+@router.message(F.text == 'Изменить способности')
 async def ability(message: Message):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -1013,7 +1013,7 @@ async def ability(message: Message):
                                  f'Бонус к увеличению 🪙:{balls_x}\n'
                                  f'\nКоличество 🪙:{balls}'
                                  f'\nБаланс: {balance}\n'
-                                 f'\nВыберите, что прокачать:\n'
+                                 f'\nВыберите, что улучшить:\n'
                                  f'1. Восстановление жизни: Увеличьте количество жизней!\n'
                                  f'2. Увеличение 🪙: Получайте больше 🪙 за правильные ответы!\n\nВаш выбор?', reply_markup=kb.ability)
     user_messages[user_id] = [message.message_id, new_message.message_id]
@@ -1023,7 +1023,7 @@ async def ability(message: Message):
 async def ability(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -1142,7 +1142,7 @@ async def restoration_of_balls(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы прокачали X к востановлению 🪙!\n"
+                f"Вы увеличили X к восстановлению 🪙!\n"
                 f"Теперь вы будете получать за каждый ответ {balls_x} 🪙.\n"
                 f"Оставшийся баланс: {balance}", reply_markup=kb.ability
             )
@@ -1157,11 +1157,11 @@ async def restoration_of_balls(message: Message,state: FSMContext):
 
 
 
-@router.message(F.text == 'X к востановлению жизни')
+@router.message(F.text == 'X к восстановлению жизни')
 async def restoration_of_life(message: Message,state: FSMContext):
     user_id = message.from_user.id
     if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования.⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
     await message.delete()
     if user_id in user_messages:
@@ -1260,7 +1260,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы повысили X к востановлению жизни!\n"
+                f"Вы повысили X к восстановлению жизни!\n"
                 f"Теперь вы  получаете за каждый ответ {count_otvet_x} 🪙.\n"
                 f"Оставшиеся 🪙: {balls}", reply_markup=kb.ability
             )
@@ -1284,7 +1284,7 @@ async def restoration_of_life_one(message: Message,state: FSMContext):
             conn.commit()
             await state.clear()
             new_message = await message.answer(
-                f"Вы увеличили X к востановлению 🪙!\n"
+                f"Вы увеличили X к восстановлению 🪙!\n"
                 f"Теперь вы  получаете за каждый ответ {count_otvet_x} 🪙.\n"
                 f"Оставшийся баланс: {balance}", reply_markup=kb.ability
             )
@@ -1324,7 +1324,7 @@ async def arena(message: Message):
     await message.delete()
 
     if user_id in active_players:
-        await message.answer("⛔Вы не можете использовать другие команды во время соревнования⛔")
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
 
     if user_id in user_messages:
@@ -1355,7 +1355,7 @@ async def select_category(callback: CallbackQuery):
     category = callback.data.split('_')[1]
 
     if user_id in waiting_queue.get(category, []):
-        await callback.message.answer("Вы не можете соревноваться с самим собой.")
+        await callback.message.answer("Вы не можете соревноваться с самим собой 🤔")
         print(waiting_queue.get(category, []))
         return
 

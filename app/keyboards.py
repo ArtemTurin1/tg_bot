@@ -26,7 +26,7 @@ form_menu = ReplyKeyboardMarkup(keyboard=[
                            input_field_placeholder='Выберите пункт...')
 
 lk = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Статистика'),
-                                       KeyboardButton(text = 'Изменить способности способности')],
+                                       KeyboardButton(text = 'Изменить способности')],
                                      [KeyboardButton(text = 'Вернуться в главное меню')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
