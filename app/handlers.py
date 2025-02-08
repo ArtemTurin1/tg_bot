@@ -1837,7 +1837,7 @@ async def activate_profile(message: types.Message):
     conn.commit()
     await start_profile_creation(message, None)
 
-
+#isnisng
 @router.message(F.text == "Начать поиск")
 async def view_profiles(message: types.Message, state: FSMContext):
     await show_next_profile(message, message.from_user.id, state)
