@@ -1403,9 +1403,9 @@ async def leave_competition(message: Message):
             active_players.discard(user1_id)
             active_players.discard(user2_id)
         else:
-            await message.answer("⛔Вы не участвуете в игре.")
+            await message.answer("❗️ Вы не участвуете в игре ❗️")
     else:
-        await message.answer("⛔Вы не находитесь в соревновании.")
+        await message.answer("❗️ Вы не находитесь в соревновании ❗️")
 
 async def send_task(user1_id, user2_id, category):
     task = get_random_task(category)
@@ -1450,7 +1450,7 @@ async def leave_arena(callback: CallbackQuery):
                 pass
         user_messages[user_id] = []
 
-    new_message = await callback.message.answer('🚷Поиск соперника прекращен🚷', reply_markup=kb.zd)
+    new_message = await callback.message.answer('🚷 Поиск соперника прекращен 🚷', reply_markup=kb.zd)
     user_messages[user_id] = [callback.message.message_id, new_message.message_id]
 
 @router.message(F.text == "Поиск Учителя/Ученика")
@@ -1463,7 +1463,7 @@ async def profiles(message: types.Message):
             except Exception:
                 pass
         user_messages[user_id] = []
-    new_message = await message.answer('Выберите один из пунктов', reply_markup=kb.form)
+    new_message = await message.answer('Выберите один из пунктов 🖍', reply_markup=kb.form)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 
@@ -1527,7 +1527,7 @@ async def start_profile_creation(message: types.Message, state: FSMContext):
 
 
     else:
-        new_message = await message.answer("Давайте начнем создание вашей анкеты\nВведите ваше имя:")
+        new_message = await message.answer("Давайте начнем создание вашей анкеты❗️\nВведите ваше имя:")
         await state.set_state(ProfileState.waiting_for_name)
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
@@ -1559,7 +1559,7 @@ async def edit_profile(message: types.Message, state: FSMContext):
     result = cursor.fetchone()
 
     if not result:
-        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        await message.answer("У вас нет анкеты. Сначала создайте её❗️")
         return
 
 
@@ -1597,7 +1597,7 @@ async def process_edit_choice(message: types.Message, state: FSMContext):
         await start_profile_creation(message, state)
         await state.clear()
     else:
-        new_message = await message.answer("Пожалуйста, выберите один из предложенных вариантов.")
+        new_message = await message.answer("Пожалуйста, выберите один из предложенных вариантов ❗️")
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 @router.message(ProfileState.editing_name)
@@ -1804,7 +1804,7 @@ async def process_photo(message: types.Message, state: FSMContext):
     """, (max_id, message.from_user.id, user_data['name'],user_data['name_tg'], user_data['role'], user_data['subject'], user_data['description'], photo_id, int(age), 0, 1))
     conn.commit()
 
-    new_message = await message.answer("Анкета успешно сохранена! Другие пользователи могут её просмотреть.", reply_markup=kb.form)
+    new_message = await message.answer("Анкета успешно сохранена❗️ Другие пользователи могут её просмотреть.", reply_markup=kb.form)
     await state.clear()
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
@@ -1815,7 +1815,7 @@ async def deactivate_profile(message: types.Message):
     result = cursor.fetchone()
 
     if not result:
-        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        await message.answer("У вас нет анкеты. Сначала создайте её, займёт 5 минут❗️")
         return
 
     cursor.execute("UPDATE profile_form SET is_active = 0 WHERE user_id = ?", (user_id,))
@@ -1830,7 +1830,7 @@ async def activate_profile(message: types.Message):
     result = cursor.fetchone()
 
     if not result:
-        await message.answer("У вас нет анкеты. Сначала создайте её.")
+        await message.answer("У вас нет анкеты. Сначала создайте её❗️")
         return
 
     cursor.execute("UPDATE profile_form SET is_active = 1 WHERE user_id = ?", (user_id,))
