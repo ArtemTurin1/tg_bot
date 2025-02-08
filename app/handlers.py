@@ -1972,3 +1972,4 @@ async def continue_profiles(callback: CallbackQuery):
     user_id = callback.from_user.id
     await callback.message.delete()
     await show_next_profile(callback.message, user_id)
+    всвсвасмавса
