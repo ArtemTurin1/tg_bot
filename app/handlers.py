@@ -32,7 +32,7 @@ user_messages = {}
 
 conn = sqlite3.connect('db.sqlite3')
 cursor = conn.cursor()
-bot = Bot(token='7885226501:AAFqfa4vmZ_FUOlAuSXa4-jUqcRriG7w1Qs')
+bot = Bot(token='7882619849:AAF4WABwNdKvnQ39-mgh0STAztWMyD-VXpM')
 
 supports_canal = '-1002427853005'
 
@@ -74,19 +74,14 @@ async def reset_premium(user_id: int):
             await session.commit()
             print(f"Премиум для пользователя {user_id} обнулён.")
 
-
-
-
-# Функция таймера для добавления попыток
 async def start_timer_for_attempts(user_id):
     while True:
         cursor.execute("SELECT count_otvet_x FROM users WHERE tg_id = ?", (user_id,))
         count_otvet_x = int(cursor.fetchone()[0])
         if count_otvet_x == 0:
             count_otvet_x = 1
-        await asyncio.sleep(1 * 3600 / count_otvet_x)  # Таймер
+        await asyncio.sleep(3600 / count_otvet_x)
         conn.commit()
-        # Используем один запрос к базе данных с условным обновлением
         cursor.execute("""
                 UPDATE users 
                 SET count_otvet = CASE 
@@ -95,30 +90,12 @@ async def start_timer_for_attempts(user_id):
                 WHERE tg_id = ?;
             """, (user_id,))
         conn.commit()
-
-        # Эффективно проверяем обновленное значение после обновления
         cursor.execute("SELECT count_otvet FROM users WHERE tg_id = ?", (user_id,))
         count_otvet = int(cursor.fetchone()[0])
 
         if count_otvet >= 3:
             active_timers.pop(user_id, None)
             break
-
-
-
-
-'''@router.message(F.photo)
-async def photo_handler(message: Message):
-    photo_data = message.photo[-1]
-    await message.answer(f'{photo_data.file_id}')'''
-
-@router.message(F.document)
-async def document_handler(message: Message):
-    document = message.document  # Получаем объект документа
-    file_id = document.file_id  # Уникальный идентификатор файла
-    file_name = document.file_name  # Имя файла
-
-    await message.answer(f'Файл сохранен!\n\n📄 File ID: `{file_id}`\n📂 File Name: `{file_name}`', parse_mode="Markdown")
 
 
 @router.message(F.text == 'Добавить задание')
@@ -317,7 +294,7 @@ async def reg_age(message: Message, state: FSMContext):
 async def reg_referral(message: Message, state: FSMContext):
     referral_nickname = message.text
     if referral_nickname.lower() == 'нет':
-        referral_nickname = None
+        referral_nickname = 'нет'
     else:
         async with async_session() as session:
             ref_user = await session.scalar(select(User).where(User.name == referral_nickname))
@@ -325,7 +302,6 @@ async def reg_referral(message: Message, state: FSMContext):
                 await message.answer('🚫 Указанный никнейм не существует. Пожалуйста, попробуйте ещё раз или напишите "нет".')
                 return
             else:
-                # Увеличиваем счетчик приглашенных
                 ref_user.invited_count += 1
                 ref_user.balls += 20
                 session.add(ref_user)
@@ -433,17 +409,17 @@ async def daily_tasks_one(message: Message):
         user_messages[user_id] = []
     if count_otvet > 0:
 
-        new_message = await message.answer(f'🎯 Выбирите предмет 🎯', reply_markup=await kb.materialcategorii())
+        new_message = await message.answer(f'🎯 Выберите предмет 🎯', reply_markup=await kb.materialcategorii())
     else:
         new_message = await message.answer(
-            '🚫 Ваши попытки закончились 🚫\nПодождите немого для востановления жизней\nЕсли хотите решать задачи без ограничений вы можете оформить подписку 😊',
+            '🚫 Ваши попытки закончились 🚫\nПодождите немого для восстановления жизней\nЕсли хотите решать задачи без ограничений вы можете оформить подписку 😊',
             reply_markup=await kb.glavn())
     user_messages[user_id] = [message.message_id, new_message.message_id]
 
 
 @router.callback_query(F.data.startswith('category_'))
 async def maretialcotegori(callback: CallbackQuery):
-    await callback.answer(f'Вы выбрали  предмет')
+    await callback.answer(f'Вы выбрали предмет')
 
 
     await callback.message.edit_text(
@@ -509,8 +485,6 @@ async def materialcotegori(callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
         randomphoto = random.choice(rand_photo)
         await callback.message.answer_photo(photo=randomphoto)
-
-        # Проверяем ответ для выбранного фото
         for i in photo_data2:
             if randomphoto == i.photo:
                 await state.update_data(vanswer=i.answer)
@@ -529,8 +503,6 @@ async def his_answer(message: Message, state: FSMContext):
     count_otvet = float(result[0]) if result else 0
     conn.commit()
     user_id = message.from_user.id
-
-    # Удаление сообщений пользователя
     await message.delete()
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
@@ -539,8 +511,6 @@ async def his_answer(message: Message, state: FSMContext):
             except Exception:
                 pass
         user_messages[user_id] = []
-
-    # Проверка ответа
     await state.update_data(answer=message.text)
     data = await state.get_data()
     if data['vanswer'] == data['answer'] and count_otvet > 1:
@@ -566,29 +536,17 @@ async def his_answer(message: Message, state: FSMContext):
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
     elif data['vanswer'] != data['answer'] and count_otvet > 1:
-        # Обновление при неправильном ответе
         cursor.execute("UPDATE users SET count_otvet = count_otvet - 1 WHERE tg_id = ?", (user_id,))
-
         conn.commit()
-
-        cursor.execute("SELECT solved_tasks FROM users WHERE tg_id = ?", (user_id,))
-        solved_tasks = int(cursor.fetchone()[0])
-        solved_tasks += 1
-        cursor.execute("UPDATE users SET solved_tasks = ? WHERE tg_id = ?", (solved_tasks, user_id))
-        conn.commit()
-
         new_message = await message.answer(
             f'😿 Упс! Ответ неверный. 😿\nУ вас осталось {count_otvet - 1} попыток. Не отчаивайтесь и пробуйте снова❗️',
             reply_markup=await kb.materials(data['number'])
         )
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
-
-        # Запуск таймера для добавления попыток, если его нет
         if user_id not in active_timers:
             active_timers[user_id] = asyncio.create_task(start_timer_for_attempts(user_id))
     else:
-        # Обработка, если попытки закончились
         cursor.execute("UPDATE users SET count_otvet = 0 WHERE tg_id = ?", (user_id,))
         conn.commit()
 
@@ -599,8 +557,6 @@ async def his_answer(message: Message, state: FSMContext):
         )
         user_messages[user_id] = [message.message_id, new_message.message_id]
         await state.clear()
-
-        # Запуск таймера для добавления попыток, если его нет
         if user_id not in active_timers:
             active_timers[user_id] = asyncio.create_task(start_timer_for_attempts(user_id))
 
@@ -674,7 +630,6 @@ async def supportansver(message: Message,state: FSMContext):
         f'\n(Если вы хотите получить ответ лично, пожалуйста разрешите писать вам другим пользователям в телеграмме.')
     await state.clear()
 
-
 @router.message(F.text == 'Таблица лидеров')
 async def support(message: Message):
     user_id = message.from_user.id
@@ -702,53 +657,18 @@ async def support(message: Message):
             id_count += 1
             if id_count <= max_users_balls:
                 if id_count == 1:
-                    msg += f'🥇 👤{name_user} -- {balls_usser} 🪙)\n'
-                if id_count == 2:
+                    msg += f'🥇 👤{name_user} -- {balls_usser} 🪙\n'
+                elif id_count == 2:
                     msg += f'🥈 👤{name_user} -- {balls_usser} 🪙\n'
-                if id_count == 3:
+                elif id_count == 3:
                     msg += f'🥉 👤{name_user} -- {balls_usser} 🪙\n'
-                msg += f'№{id_count}) 👤{name_user} -- {balls_usser} 🪙\n'
+                elif id_count >= 4:
+                    msg += f'№{id_count}) 👤{name_user} -- {balls_usser} 🪙\n'
 
             else:
                 break
         new_message = await message.answer(f'Топ 10 пользователей:\n{msg}', reply_markup= kb.main)
     user_messages[user_id] = [message.message_id, new_message.message_id]
-
-@router.message(F.text == 'Вернуться в главное меню')
-async def gl(message: Message):
-    user_id = message.from_user.id
-    if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
-        return
-    await message.delete()
-    if user_id in user_messages:
-        for msg_id in user_messages[user_id]:
-            try:
-                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
-            except Exception:
-                pass
-        user_messages[user_id] = []
-    new_message = await message.answer('🕎 Вы перешли в главное меню 🕎', reply_markup= kb.main)
-    user_messages[user_id] = [message.message_id, new_message.message_id]
-
-@router.message(F.text == 'Вернуться назад')
-async def back_button(message: types.Message):
-    user_id = message.from_user.id
-    if any(user_id in pair for pair in active_games.keys()):
-        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
-        return
-    await message.delete()
-    if user_id in user_messages:
-        for msg_id in user_messages[user_id]:
-            try:
-                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
-            except Exception:
-                pass
-        user_messages[user_id] = []
-        new_message = await message.answer("Вы вернулись назад ↩️", reply_markup=kb.lk)
-        user_messages[user_id] = [message.message_id, new_message.message_id]
-
-
 
 @router.message(F.text == 'Статистика')
 async def stats(message: Message):
@@ -1396,7 +1316,8 @@ async def leave_competition(message: Message):
             user1_id, user2_id = game_to_exit
             del active_games[game_to_exit]
 
-            await message.answer("⛓️‍💥Вы вышли из игры.⛓️‍💥", reply_markup=await kb.main())
+            await message.answer("⛓️‍💥Вы вышли из игры.⛓️‍💥\nВам сняли 5 баллов", reply_markup=kb.main)
+            cursor.execute("UPDATE users SET balls = balls - 5 WHERE tg_id = ?", (user_id,))
             opponent_id = user2_id if user_id == user1_id else user1_id
             await bot.send_message(opponent_id, "👤 Ваш соперник покинул игру.\n⛓️‍💥Игра завершена.⛓️‍💥", reply_markup=kb.main)
 
@@ -1410,14 +1331,11 @@ async def leave_competition(message: Message):
 async def send_task(user1_id, user2_id, category):
     task = get_random_task(category)
     if not task:
-        print(user2_id, "Ошибка: задачи отсутствуют в выбранной категории.")
         return
     active_games[(user1_id, user2_id)]["tasks"].append(task)
-
     try:
-
-        await bot.send_photo(user1_id, task['question'], caption="Ваша задача:")
-        await bot.send_photo(user2_id, task['question'], caption="Ваша задача:")
+        await bot.send_photo(user1_id, task['question'], caption=f"#{task['id']} Ваша задача:")
+        await bot.send_photo(user2_id, task['question'], caption=f"#{task['id']} Ваша задача:")
     except Exception as e:
         pass
 
@@ -1432,14 +1350,11 @@ def get_random_task(category):
 async def leave_arena(callback: CallbackQuery):
     user_id = callback.from_user.id
     await callback.message.delete()
-
-    # Удаление из очереди поиска соперника
     removed = False
     for category, queue in waiting_queue.items():
         if user_id in queue:
             queue.remove(user_id)
             removed = True
-            print(f"Игрок {user_id} удалён из очереди категории {category}.")
             break
 
     if user_id in user_messages:
@@ -1452,6 +1367,46 @@ async def leave_arena(callback: CallbackQuery):
 
     new_message = await callback.message.answer('🚷 Поиск соперника прекращен 🚷', reply_markup=kb.zd)
     user_messages[user_id] = [callback.message.message_id, new_message.message_id]
+
+@router.message()
+async def handle_answer(message: Message):
+    user_id = message.from_user.id
+    # Проверяем, находится ли пользователь в активной игре
+    if user_id in active_players:
+        active_game = next(
+            ((game_data, user1, user2) for (user1, user2), game_data in active_games.items() if
+             user_id in (user1, user2)),
+            None,
+        )
+        if not active_game:
+            return
+        game_data, user1_id, user2_id = active_game
+        task = game_data["tasks"][-1]
+        opponent_id = user1_id if user_id == user2_id else user2_id
+        if message.text.strip() == task["answer"]:
+            game_data["scores"][user_id] += 1
+            cursor.execute("UPDATE users SET balls = balls + 1 WHERE tg_id = ?", (user_id,))
+            cursor.execute("UPDATE users SET solved_tasks = solved_tasks + 1 WHERE tg_id = ?", (user_id,))
+            conn.commit()
+            await message.answer("🎉 Верно! Вы получили 1 балл.")
+            await bot.send_message(opponent_id, "Ваш соперник ответил правильно.")
+            if len(game_data["tasks"]) >= 3:
+                winner_id = max(game_data["scores"], key=game_data["scores"].get)
+                cursor.execute("SELECT name FROM users WHERE tg_id = ?", (winner_id,))
+                result = cursor.fetchone()
+                name = str(result[0])
+                scores = game_data["scores"]
+                await bot.send_message(user1_id, f"Игра окончена! Победитель: {name}\nВерных ответов:{scores[winner_id]}.",reply_markup=await kb.main())
+                await bot.send_message(user2_id, f"Игра окончена! Победитель: {name}\nВерных ответов:{scores[winner_id]}.",reply_markup=await kb.main())
+                active_players.remove(user1_id)
+                active_players.remove(user2_id)
+                del active_games[(user1_id, user2_id)]
+            else:
+                await send_task(user1_id, user2_id, game_data["category"])
+        else:
+            await message.answer("Ответ неверный")
+    else:
+        await message.answer("Вы не можете отправлять сообщения во время соревнования.")
 
 @router.message(F.text == "Поиск Учителя/Ученика")
 async def profiles(message: types.Message):
@@ -1530,20 +1485,6 @@ async def start_profile_creation(message: types.Message, state: FSMContext):
         new_message = await message.answer("Давайте начнем создание вашей анкеты❗️\nВведите ваше имя:")
         await state.set_state(ProfileState.waiting_for_name)
     user_messages[user_id] = [message.message_id, new_message.message_id]
-
-@router.message(F.text == "Вернуться назад🔙")
-async def back(message: types.Message):
-    user_id = message.from_user.id
-    if user_id in user_messages:
-        for msg_id in user_messages[user_id]:
-            try:
-                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
-            except Exception:
-                pass
-        user_messages[user_id] = []
-    await profiles(message)
-
-
 
 @router.message(F.text == "Редактировать анкету")
 async def edit_profile(message: types.Message, state: FSMContext):
@@ -1681,7 +1622,7 @@ async def process_edit_subject(message: types.Message, state: FSMContext):
 @router.message(ProfileState.editing_photo)
 async def process_edit_photo(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    new_photo = message.text
+    new_photo = message.photo[-1].file_id
     if user_id in user_messages:
         for msg_id in user_messages[user_id]:
             try:
@@ -1689,7 +1630,7 @@ async def process_edit_photo(message: types.Message, state: FSMContext):
             except Exception:
                 pass
         user_messages[user_id] = []
-    cursor.execute("UPDATE profile_form SET photo = ? WHERE user_id = ?", (new_photo, user_id))
+    cursor.execute("UPDATE profile_form SET photo_id = ? WHERE user_id = ?", (new_photo, user_id))
     conn.commit()
     new_message = await message.answer("Фото обновлено.", reply_markup=kb.form_redact)
     await state.set_state(ProfileState.editing_profile)
@@ -1972,3 +1913,140 @@ async def continue_profiles(callback: CallbackQuery):
     user_id = callback.from_user.id
     await callback.message.delete()
     await show_next_profile(callback.message, user_id)
+
+
+@router.message(F.text == 'Понравившиеся анкеты')
+async def my_like_form(message: types.Message):
+    user_id = message.from_user.id
+    cursor.execute("SELECT profile_id FROM votes WHERE user_id = ? AND action = 'like'", (user_id,))
+    liked_profiles = cursor.fetchall()
+
+    if not liked_profiles:
+        await message.answer("У вас нет понравившихся анкет.")
+        return
+    liked_profile_ids = [profile[0] for profile in liked_profiles]
+    def get_profile_info(profile_id):
+        cursor.execute("""
+            SELECT id, name, role, subject, description, photo_id, likes, dislikes
+            FROM profile_form
+            WHERE id = ? AND user_id != ? AND is_active = 1
+        """, (profile_id, user_id))
+        return cursor.fetchone()
+    cursor.fetchone()
+    current_index = 0
+    profile = get_profile_info(liked_profile_ids[current_index])
+
+    if not profile:
+        await message.answer("Не удалось найти информацию по выбранной анкете.")
+        return
+
+    profile_info = (
+        f"👤 *{profile[1]}* ({profile[2]})\n"
+        f"📚 Предмет: {profile[3]}\n"
+        f"ℹ Описание: {profile[4]}\n"
+        f"❤️ Лайков: {profile[6]}\n"
+        f"💔 Дизлайков: {profile[7]}"
+    )
+    like_form_k = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Следующая", callback_data=f"next_{current_index}"),
+                InlineKeyboardButton(text="Назад", callback_data=f"back_{current_index}")],
+        ]
+    )
+    await message.answer_photo(
+        photo=profile[5],
+        caption=profile_info,
+        reply_markup=like_form_k,
+        parse_mode="Markdown"
+    )
+
+
+@router.callback_query(lambda c: c.data.startswith("next_") or c.data.startswith("back_"))
+async def handle_profile_navigation(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    data = callback_query.data.split('_')
+    action = data[0]
+    index = int(data[1])
+    cursor.execute("SELECT profile_id FROM votes WHERE user_id = ? AND action = 'like'", (user_id,))
+    liked_profiles = cursor.fetchall()
+    liked_profile_ids = [profile[0] for profile in liked_profiles]
+
+    if action == "next":
+        index = (index + 1) % len(liked_profile_ids)
+    elif action == "back":
+        index = (index - 1) % len(liked_profile_ids)
+    profile = get_profile_info(liked_profile_ids[index])
+
+    if not profile:
+        await callback_query.answer("Не удалось найти информацию по выбранной анкете.")
+        return
+
+    profile_info = (
+        f"👤 *{profile[1]}* ({profile[2]})\n"
+        f"📚 Предмет: {profile[3]}\n"
+        f"ℹ Описание: {profile[4]}\n"
+        f"❤️ Лайков: {profile[6]}\n"
+        f"💔 Дизлайков: {profile[7]}"
+    )
+    like_form_k = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Следующая", callback_data=f"next_{index}"),
+                InlineKeyboardButton(text="Назад", callback_data=f"back_{index}")],
+        ]
+    )
+    media = types.InputMediaPhoto(
+        media=profile[5],  # Ссылка на фото
+        caption=profile_info,
+        parse_mode="Markdown"
+    )
+
+    # Обновляем сообщение с фото
+    new_message = await callback_query.message.edit_media(
+        media=media,
+        reply_markup=like_form_k
+    )
+    await callback_query.answer()
+    user_messages[user_id] = [callback_query.message.message_id, new_message.message_id]
+
+def get_profile_info(profile_id):
+    cursor.execute("""
+        SELECT id, name, role, subject, description, photo_id, likes, dislikes
+        FROM profile_form
+        WHERE id = ? AND is_active = 1
+    """, (profile_id,))
+    return cursor.fetchone()
+
+
+@router.message(F.text == 'Вернуться назад🔙')
+async def back_button(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    if any(user_id in pair for pair in active_games.keys()):
+        await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
+        return
+    user_data = await state.get_data()
+    previous_state = user_data.get("previous_state")
+    if previous_state == "start_profile_creation":
+        # Если он был в процессе создания анкеты, возвращаем на это состояние
+        new_message = await message.answer("Вы вернулись к созданию анкеты❗️", reply_markup=kb.form)
+        await state.set_state(ProfileState.waiting_for_name)  # Ставим состояние, в котором он был
+    elif previous_state == "profiles":
+        # Если он был в поиске анкеты
+        new_message = await message.answer("Вы вернулись к поиску анкеты❗️", reply_markup=kb.form)
+        # Устанавливаем другое состояние (если нужно)
+        # await state.set_state(Поиск состояния)
+    else:
+        new_message = await message.answer("🕎 Вы перешли в главное меню 🕎", reply_markup=kb.main)
+    if user_id in user_messages:
+        for msg_id in user_messages[user_id]:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            except Exception:
+                pass
+        user_messages[user_id] = []
+
+    user_messages[user_id] = [message.message_id, new_message.message_id]
+
+
+

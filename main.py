@@ -11,7 +11,7 @@ supports_canal = '-1002335317649'
 
 async def main():
     await async_main()
-    bot = Bot(token='7885226501:AAFqfa4vmZ_FUOlAuSXa4-jUqcRriG7w1Qs')
+    bot = Bot(token='7882619849:AAF4WABwNdKvnQ39-mgh0STAztWMyD-VXpM')
     dp = Dispatcher()
     dp.include_router(router)
     await dp.start_polling(bot)

@@ -33,7 +33,7 @@ async def get_photo(photo_id):
 
 async def get_liders():
     async with async_session() as session:
-        result = await session.execute(select(User.name, User.balls).where(User.balls != 0))
+        result = await session.execute(select(User.name, User.solved_tasks).where(User.solved_tasks != 0))
         users = result.all()
         top_users = {}
         for name, balls in users:

@@ -7,13 +7,15 @@ main = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Личный каб
                                         KeyboardButton(text = 'Поиск Учителя/Ученика')],
                                        [KeyboardButton(text = 'Ежедневные задания')],
                                         [KeyboardButton(text='Таблица лидеров'),
-                                        KeyboardButton(text='Поддержка и предложения')]],
+                                        KeyboardButton(text='Поддержка и предложения 🤝')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 
-form = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Начать поиск')],
-                                        [KeyboardButton(text = 'Моя анкета'),
-                                       KeyboardButton(text = 'Понравившиеся анкеты')]],
+form = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Начать поиск'),
+                                        KeyboardButton(text = 'Моя анкета')],
+                                        [KeyboardButton(text = 'Понравившиеся анкеты'),
+                                         KeyboardButton(text = 'Вернуться назад🔙')],
+                                       ],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 
@@ -27,7 +29,7 @@ form_menu = ReplyKeyboardMarkup(keyboard=[
 
 lk = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Статистика'),
                                        KeyboardButton(text = 'Изменить способности')],
-                                     [KeyboardButton(text = 'Вернуться в главное меню')]],
+                                     [KeyboardButton(text = 'Вернуться назад🔙')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 
@@ -45,16 +47,16 @@ zd = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Решать зада
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 
-ability = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='X к востановлению жизни')],
+ability = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='X к восстановлению жизни')],
                                        [KeyboardButton(text = 'X к увеличению 🪙')],
                                         [KeyboardButton(text = 'Жизни'),
                                          KeyboardButton(text = '💲')],
-                                          [KeyboardButton(text = 'Вернуться назад')]],
+                                          [KeyboardButton(text = 'Вернуться назад🔙')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 pump = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='За 🪙'),
                                        KeyboardButton(text = 'За 💲')],
-                                       [KeyboardButton(text = 'Вернуться назад')]],
+                                       [KeyboardButton(text = 'Вернуться назад🔙')]],
                            resize_keyboard=True,
                            input_field_placeholder='Выберите пункт...')
 leave = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Покинуть соревнование')]],
@@ -62,14 +64,17 @@ leave = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text='Покинуть �
                            input_field_placeholder='Выберите пункт...')
 donat = InlineKeyboardMarkup(
     inline_keyboard=[
-        [
+
             #InlineKeyboardButton(text="Пополнить 9 руб", callback_data="pay_9"),
             #InlineKeyboardButton(text="Пополнить 19 руб", callback_data="pay_19")],
-        InlineKeyboardButton(text="Пополнить 150 руб", callback_data="pay_150"),
-            InlineKeyboardButton(text="Пополнить 100 руб", callback_data="pay_100")],
-        [InlineKeyboardButton(text="Оформить подписку 99 рублей", callback_data="pay_99")]
+        #InlineKeyboardButton(text="Пополнить 150 руб", callback_data="pay_150"),
+            #InlineKeyboardButton(text="Пополнить 100 руб", callback_data="pay_100")],
+            [InlineKeyboardButton(text="Оформить подписку 1000 рублей", callback_data="pay_1000")]
     ]
 )
+
+
+
 donat_life = InlineKeyboardMarkup(
     inline_keyboard=[
         [
