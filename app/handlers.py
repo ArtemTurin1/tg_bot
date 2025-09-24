@@ -227,6 +227,7 @@ async def save_to_database(id_task, id_material, file_id, answer):
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
+    print(active_games)
     if any(user_id in pair for pair in active_games.keys()):
         await message.answer("Вы не можете использовать другие команды во время соревнования.")
         return
@@ -2022,6 +2023,7 @@ def get_profile_info(profile_id):
 @router.message(F.text == 'Вернуться назад🔙')
 async def back_button(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
+    print(active_games, '1')
     if any(user_id in pair for pair in active_games.keys()):
         await message.answer("💢 Вы не можете использовать другие команды во время соревнования 💢")
         return
